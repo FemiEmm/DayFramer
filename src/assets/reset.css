@@ -1,0 +1,65 @@
+/* Reset all default margins, paddings, and borders */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Set a default font family and smooth font rendering */
+body {
+  font-family: Epilogue, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  color: inherit;
+  background-color: transparent;
+}
+
+/* Remove default list styling */
+ul,
+ol {
+  list-style: none;
+}
+
+/* Remove default text decoration and color for links */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Remove default border and outline on inputs and buttons */
+button,
+input,
+textarea {
+  border: none;
+  outline: none;
+  font: inherit;
+  background: none;
+  color: inherit;
+}
+
+/* Set default styles for tables */
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* Set media elements to fit their containers */
+img,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Remove button-specific styles */
+button {
+  cursor: pointer;
+}
+
+/* Remove default fieldset border */
+fieldset {
+  border: none;
+}

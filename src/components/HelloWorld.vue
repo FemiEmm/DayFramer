@@ -121,20 +121,39 @@ export default defineComponent({
 });
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
+.hello {
+  color: var(--primary-text-color);
+}
+
+h1 {
+  color: var(--primary-text-color);
+}
+
+p {
+  color: var(--secondary-text-color);
+}
+
 h3 {
   margin: 40px 0 0;
+  color: var(--primary-text-color);
 }
+
 ul {
   list-style-type: none;
   padding: 0;
 }
+
 li {
   display: inline-block;
   margin: 0 10px;
 }
+
 a {
-  color: #42b983;
+  color: var(--button-color);
+}
+
+a:hover {
+  color: var(--button-hover-color);
 }
 </style>
