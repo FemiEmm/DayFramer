@@ -63,12 +63,13 @@ import { nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/lib/supabase";
 
-
-
-import lookDownImg from "@/assets/interaction/lookDown.png";
-import wellDoneImg from "@/assets/interaction/WellDone.png";
-
 const router = useRouter();
+
+/** Build a URL to a file in /public, respecting Vite base (works on Netlify subpaths) */
+const publicUrl = (p: string) => `${import.meta.env.BASE_URL}${p.replace(/^\//, "")}`;
+
+const IMG_LOOKDOWN = publicUrl("interaction/lookdown.png");
+const IMG_WELLDONE = publicUrl("interaction/welldone.png");
 
 // local state
 const firstName = ref("");
@@ -81,7 +82,7 @@ const err = ref("");
 const showNextModal = ref(false);
 
 // avatar / animation state
-const currentImg = ref<string>(lookDownImg);
+const currentImg = ref<string>(IMG_LOOKDOWN);
 const popping = ref(false);
 
 async function save() {
@@ -104,13 +105,13 @@ async function save() {
     if (error) throw error;
 
     // Success: swap image and trigger bubble zoom
-    currentImg.value = wellDoneImg;
+    currentImg.value = IMG_WELLDONE;
     popping.value = false;
     await nextTick();         // ensure class reflow
     popping.value = true;     // triggers CSS animation via .pop
-    // modal will open in onPopEnd()
   } catch {
     err.value = "Could not save your profile. Please try again.";
+    currentImg.value = IMG_LOOKDOWN;
   } finally {
     saving.value = false;
   }
@@ -151,7 +152,6 @@ function go(routeName: "Onboarding" | "Homepage") {
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,.08);
   padding: 20px;
-  /* height kept responsive; adjust if you want a fixed min-height */
   height: clamp(380px, 60vh, 560px);
 }
 
