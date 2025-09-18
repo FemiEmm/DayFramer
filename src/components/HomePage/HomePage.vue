@@ -69,7 +69,7 @@ import TodayCard from "./TodayCard.vue";
 import UiBadge from "./UiBadge.vue";
 
 /* NEW: reusable modal + your plan form */
-import BaseModal from "@/components/ui/BaseModal.vue";
+import BaseModal from "@/components/Ui/BaseModal.vue";
 import PlanMyDayForm from "@/components/HomePage/PlanMyDayForm.vue"; // adjust path if you placed it elsewhere
 
 export default defineComponent({

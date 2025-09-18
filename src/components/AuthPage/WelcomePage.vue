@@ -79,7 +79,7 @@ import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
 import { useRoute } from "vue-router";
 
 import UiBadge from "@/components/HomePage/UiBadge.vue";
-import BaseModal from "@/components/ui/BaseModal.vue";
+import BaseModal from "@/components/Ui/BaseModal.vue";
 import PlanMyDayForm from "@/components/HomePage/PlanMyDayForm.vue";
 
 /* Auth components (same folder) */

@@ -42,7 +42,7 @@
 
 <script lang="ts" setup>
 import { computed, ref, watch } from "vue";
-import BaseModal from "@/components/ui/BaseModal.vue";
+import BaseModal from "@/components/Ui/BaseModal.vue";
 import PlanMyDayForm from "@/components/HomePage/PlanMyDayForm.vue";
 
 const props = defineProps<{
