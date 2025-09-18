@@ -63,7 +63,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
-import DashBoard from "../DashBoard.vue"; // untouched
+import DashBoard from "../DashBoard.vue";
 import UserGreeting from "@/components/HomePage/UserGreeting.vue";
 import TodayCard from "./TodayCard.vue";
 import UiBadge from "./UiBadge.vue";

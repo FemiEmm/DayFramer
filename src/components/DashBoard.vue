@@ -41,7 +41,7 @@
         </button>
       </li>
       <li>
-        <button @click="navigateTo('Manager')">
+        <button @click="navigateTo('TeamManagement')">
           <i class="icon fa fa-cogs"></i>
           <span class="text">Admin</span>
         </button>

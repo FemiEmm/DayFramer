@@ -1,61 +1,33 @@
 // src/router/index.ts
-import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
+import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
+
 import HomePage from "@/components/HomePage/HomePage.vue";
 import DayFramer from "@/components/DayFramer/DayFramer.vue";
 import DayView from "@/components/DayFramer/DayView.vue";
-import LocalStorageManager from "@/LocalStorageManager.vue";
 import DashBoard from "@/components/DashBoard.vue";
 import MonthlyView from "@/components/Monthly/MonthlyView.vue";
+import TeamManagementPage from "@/components/Monthly/TeamManagementPage.vue"; // ✅ in Monthly
 import OnBoardingPage from "@/components/Onboarding/OnBoardingPage.vue";
-
-// Welcome page (first page)
 import WelcomePage from "@/components/AuthPage/WelcomePage.vue";
-
-// WIP + 404 pages
 import WIPPage from "@/components/WorkInProgress/WorkInProgress.vue";
 import NotFound from "@/components/WorkInProgress/NotFound.vue";
-
-// src/router/index.ts
 import SettingsPage from "@/components/SettingsPage/SettingsPage.vue";
 
-
 const routes: Array<RouteRecordRaw> = [
-  // FIRST PAGE: WelcomePage
   { path: "/", name: "Welcome", component: WelcomePage },
 
-  // Auth email flows
-  {
-    path: "/auth/callback",
-    name: "AuthCallback",
-    component: () => import("@/components/AuthPage/AuthCallback.vue"),
-  },
-  {
-    path: "/forgot-password",
-    name: "ForgotPassword",
-    component: () => import("@/components/AuthPage/ForgotPassword.vue"),
-  },
+  // Auth
+  { path: "/auth/callback", name: "AuthCallback", component: () => import("@/components/AuthPage/AuthCallback.vue") },
+  { path: "/forgot-password", name: "ForgotPassword", component: () => import("@/components/AuthPage/ForgotPassword.vue") },
 
-  // Aliases to open specific tabs on Welcome
-  {
-    path: "/signin",
-    name: "SignIn",
-    redirect: (to) => ({ path: "/", query: { ...to.query, mode: "signin" } }),
-  },
-  {
-    path: "/signup",
-    name: "SignUp",
-    redirect: (to) => ({ path: "/", query: { ...to.query, mode: "signup" } }),
-  },
-  {
-    path: "/welcome",
-    name: "WelcomeAlias",
-    redirect: (to) => ({ path: "/", query: to.query }),
-  },
+  // Aliases to Welcome with a mode param
+  { path: "/signin",  name: "SignIn",  redirect: (to) => ({ path: "/", query: { ...to.query, mode: "signin" } }) },
+  { path: "/signup",  name: "SignUp",  redirect: (to) => ({ path: "/", query: { ...to.query, mode: "signup" } }) },
+  { path: "/welcome", name: "WelcomeAlias", redirect: (to) => ({ path: "/", query: to.query }) },
 
-  // Home kept at /home
+  // App pages
   { path: "/home", name: "Homepage", component: HomePage },
-
-  { path: "/about", name: "about", component: () => import("../views/AboutView.vue") },
+  { path: "/about", name: "About", component: () => import("@/views/AboutView.vue") },
   { path: "/day/:day/:month/:year", name: "DayView", component: DayView, props: true },
 
   {
@@ -68,10 +40,12 @@ const routes: Array<RouteRecordRaw> = [
   },
 
   { path: "/monthly", name: "Monthly", component: MonthlyView },
-  { path: "/manager", name: "Manager", component: LocalStorageManager, props: true },
   { path: "/dashboard", name: "DashBoard", component: DashBoard },
   { path: "/onboarding", name: "Onboarding", component: OnBoardingPage },
   { path: "/settings", name: "Settings", component: SettingsPage },
+
+  // Team Management (now under Monthly)
+  { path: "/team/manage", name: "TeamManagement", component: TeamManagementPage, meta: { requiresAuth: true } },
 
   // WIP + 404
   { path: "/wip", name: "WIP", component: WIPPage },
@@ -82,6 +56,7 @@ const routes: Array<RouteRecordRaw> = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+  scrollBehavior: () => ({ top: 0 }),
 });
 
 export default router;

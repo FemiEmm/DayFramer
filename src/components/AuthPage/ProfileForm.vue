@@ -63,17 +63,10 @@ import { nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "@/lib/supabase";
 
-/**
- * NOTE on image paths:
- * Replace the imports below with your exact filenames if they contain spaces.
- * For example, if your files are literally:
- *   assets/interaction/1 look down.png
- *   assets/interaction/2 well done.png
- * then rename them to "look-down.png" and "well-done.png" (recommended),
- * or adjust the import paths accordingly.
- */
-import lookDownImg from "@/assets/interaction/lookdown.png";
-import wellDoneImg from "@/assets/interaction/welldone.png";
+
+
+import lookDownImg from "@/assets/interaction/lookDown.png";
+import wellDoneImg from "@/assets/interaction/WellDone.png";
 
 const router = useRouter();
 
