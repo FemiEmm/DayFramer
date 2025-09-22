@@ -164,7 +164,7 @@ onMounted(async () => {
   await loadTeam();
 });
 
-/** Utilities for code creation from name (kept from prior step) */
+/** Utilities for code creation from name */
 function normalizeForCode(name: string) {
   return name.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
 }
@@ -181,6 +181,18 @@ async function loadUser() {
   userId.value = data.user?.id ?? null;
 }
 
+async function getMyDisplayName(): Promise<string> {
+  const uid = userId.value;
+  if (!uid) return "User";
+  const { data: p } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", uid)
+    .maybeSingle();
+  return p?.display_name || "User";
+}
+
+/** Owners and members both see everyone; only owners can remove */
 async function loadTeam() {
   msg.value = "";
   action.value = "load";
@@ -188,56 +200,82 @@ async function loadTeam() {
   members.value = [];
   if (!userId.value) return;
 
-  // memberships
-  const { data: mems, error: mErr } = await supabase
-    .from("team_members")
-    .select("team_id, role")
-    .eq("user_id", userId.value);
+  let teamId: string | null = null;
 
-  if (mErr || !mems?.length) return;
-
-  const teamId = mems.find(m => m.role === "owner")?.team_id ?? mems[0].team_id;
-
-  // team
-  const { data: teams } = await supabase
+  // 1) If user CREATED a team, prefer that
+  const { data: ownedTeams, error: ownedErr } = await supabase
     .from("teams")
     .select("*")
-    .eq("id", teamId)
+    .eq("owner_id", userId.value)
+    .order("created_at", { ascending: true })
     .limit(1);
 
-  if (!teams?.[0]) return;
-  myTeam.value = teams[0] as Team;
+  if (ownedErr) {
+    msg.value = ownedErr.message || "Failed to check owned team.";
+    return;
+  }
 
-  // members
-  const { data: rawMembers } = await supabase
+  if (ownedTeams && ownedTeams[0]) {
+    myTeam.value = ownedTeams[0] as Team;
+    teamId = myTeam.value.id;
+  } else {
+    // 2) Otherwise, find a team where this user is a member
+    const { data: mems, error: mErr } = await supabase
+      .from("team_members")
+      .select("team_id, role, created_at")
+      .eq("user_id", userId.value)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (mErr) {
+      msg.value = mErr.message || "Failed to check memberships.";
+      return;
+    }
+    if (!mems || !mems[0]) return;
+
+    teamId = mems[0].team_id;
+
+    // fetch the team header for non-owners
+    const { data: teams } = await supabase
+      .from("teams")
+      .select("*")
+      .eq("id", teamId)
+      .limit(1);
+
+    if (teams && teams[0]) {
+      myTeam.value = teams[0] as Team;
+    }
+  }
+
+  if (!teamId) return;
+
+  // 3) Fetch EVERY member on that team
+  const { data: rawMembers, error: memErr2 } = await supabase
     .from("team_members")
-    .select("user_id, role, created_at")
+    .select("user_id, role, display_name, created_at")
     .eq("team_id", teamId)
     .order("created_at", { ascending: true });
 
-  const ids = (rawMembers ?? []).map(r => r.user_id);
-  let namesMap = new Map<string, string>();
-  if (ids.length) {
-    const { data: profs } = await supabase
-      .from("profiles")
-      .select("id, display_name")
-      .in("id", ids);
-    namesMap = new Map((profs ?? []).map(p => [p.id, p.display_name || "User"]));
+  if (memErr2) {
+    msg.value = memErr2.message || "Failed to load members.";
+    return;
   }
 
   members.value = (rawMembers ?? []).map(r => ({
     user_id: r.user_id,
     role: r.role as Role,
-    display_name: namesMap.get(r.user_id) || "User",
+    display_name: r.display_name || "User",
   }));
 }
 
-/** Create team with name→code */
+/** Create team with name→code and add owner as member (with display_name) */
 async function createTeam() {
   if (!teamName.value || !userId.value) return;
   busy.value = true;
   action.value = "create";
   msg.value = "";
+
+  const myName = await getMyDisplayName();
 
   const MAX_TRIES = 5;
   for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
@@ -254,7 +292,7 @@ async function createTeam() {
 
       const { error: mErr } = await supabase
         .from("team_members")
-        .insert({ team_id: team.id, user_id: userId.value, role: "owner" });
+        .insert({ team_id: team.id, user_id: userId.value, role: "owner", display_name: myName });
 
       if (mErr) {
         msg.value = mErr.message || "Team created but failed to add owner.";
@@ -283,7 +321,7 @@ async function createTeam() {
   }
 }
 
-/** Join by code */
+/** Join by code (store display_name on membership row) */
 async function joinTeam() {
   if (!joinCode.value || !userId.value) return;
   busy.value = true;
@@ -315,9 +353,11 @@ async function joinTeam() {
       return;
     }
 
+    const myName = await getMyDisplayName();
+
     const { error: addErr } = await supabase
       .from("team_members")
-      .insert({ team_id: team.id, user_id: userId.value, role: "member" });
+      .insert({ team_id: team.id, user_id: userId.value, role: "member", display_name: myName });
 
     if (addErr) {
       msg.value = addErr.message || "Could not join team.";
@@ -382,7 +422,6 @@ async function leaveTeamOwnerWithOtherOwners() {
   action.value = "leave";
   msg.value = "";
   try {
-    // simply remove self membership; team stays with the other owner(s)
     const { error } = await supabase
       .from("team_members")
       .delete()
@@ -394,7 +433,7 @@ async function leaveTeamOwnerWithOtherOwners() {
       return;
     }
 
-    // If the team.owner_id is me, we should move owner_id to one of the remaining owners.
+    // If the team.owner_id is me, move owner_id to one of the remaining owners.
     if (myTeam.value?.owner_id === userId.value) {
       const fallbackOwner = members.value.find(m => m.role === "owner" && m.user_id !== userId.value);
       if (fallbackOwner) {
@@ -519,7 +558,8 @@ async function removeMember(uid: string) {
       msg.value = error.message || "Failed to remove member.";
       return;
     }
-    members.value = members.value.filter(m => m.user_id !== uid);
+    // Refresh list so owners & members both see updated roster
+    await loadTeam();
   } finally {
     busy.value = false;
   }

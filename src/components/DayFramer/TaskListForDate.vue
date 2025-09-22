@@ -1,7 +1,12 @@
 <!-- src/components/HomePage/TasksForDate.vue -->
 <template>
   <!-- Renders nothing when there are no tasks for the date -->
-  <ul v-if="list.length" class="rows">
+  <ul
+    v-if="list.length"
+    class="rows"
+    ref="rowsEl"
+    :style="{ height: rowsHeight }"
+  >
     <li
       v-for="(t, idx) in list"
       :key="t.id || idx"
@@ -84,7 +89,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch, computed, onMounted } from "vue";
+import { ref, watch, computed, onMounted, nextTick, onBeforeUnmount } from "vue";
 import { supabase } from "@/lib/supabase";
 
 type TaskType = "meeting" | "health" | "home" | "others" | string;
@@ -150,6 +155,7 @@ async function loadFromSupabase() {
     }));
   }
   loading.value = false;
+  recalcHeight(); // after data fetch
 }
 
 onMounted(async () => {
@@ -180,17 +186,17 @@ const editingKey = ref<string | null>(null);
 const editTitle = ref<string>("");
 const editNote = ref<string>("");
 
-/* ===== Edit actions (update Supabase) ===== */
 function beginEdit(task: Task) {
   editingKey.value = taskKey(task);
   editTitle.value = task.title || "";
   editNote.value = task.note || "";
+  nextTick(recalcHeight);
 }
-
 function cancelEdit() {
   editingKey.value = null;
   editTitle.value = "";
   editNote.value = "";
+  nextTick(recalcHeight);
 }
 
 async function saveEdit(task: Task) {
@@ -215,7 +221,43 @@ async function deleteTask(task: Task) {
   if (!task.id) return;
   const { error } = await supabase.from("tasks").delete().eq("id", task.id);
   if (!error) raw.value = raw.value.filter((t) => t.id !== task.id);
+  nextTick(recalcHeight);
 }
+
+/* ====== Show exactly 5 items before scrolling (hide scrollbar) ====== */
+const rowsEl = ref<HTMLElement | null>(null);
+const rowsHeight = ref<string>("auto");
+
+async function recalcHeight() {
+  await nextTick();
+  const el = rowsEl.value;
+  if (!el) return;
+
+  const items = Array.from(el.querySelectorAll<HTMLElement>(".row"));
+  if (items.length <= 5) {
+    rowsHeight.value = "auto"; // no scroll if 5 or fewer
+    return;
+  }
+
+  const elRect = el.getBoundingClientRect();
+  const endRect = items[4].getBoundingClientRect(); // 5th item (0-based)
+  // Add a small buffer for grid gap/shadow bleed
+  const px = Math.max(0, Math.ceil(endRect.bottom - elRect.top + 8));
+  rowsHeight.value = `${px}px`; // container fixed height; overflow will scroll
+}
+
+// Recompute when list length or edit state changes or window resizes
+watch(() => list.value.length, recalcHeight);
+watch(editingKey, recalcHeight);
+
+let onResize: (() => void) | null = null;
+onMounted(() => {
+  onResize = () => recalcHeight();
+  window.addEventListener("resize", onResize);
+});
+onBeforeUnmount(() => {
+  if (onResize) window.removeEventListener("resize", onResize);
+});
 </script>
 
 <style scoped>
@@ -227,7 +269,14 @@ async function deleteTask(task: Task) {
   gap: 10px;
   width: 100%;
   max-width: 1200px;
+
+  /* scroll container; scrollbar hidden */
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;     /* Firefox */
+  -ms-overflow-style: none;  /* IE/old Edge */
 }
+.rows::-webkit-scrollbar { width: 0; height: 0; }
 
 /* card row */
 .row {
@@ -247,6 +296,7 @@ async function deleteTask(task: Task) {
   overflow: hidden;
   text-align: left;
   transition: box-shadow .18s ease, transform .18s ease;
+  min-height: 92px; /* helps keep 5-row height predictable; tweak if needed */
 }
 .row:hover {
   box-shadow: 0 16px 40px rgba(0,0,0,.14), 0 4px 10px rgba(0,0,0,.08);
@@ -352,7 +402,6 @@ async function deleteTask(task: Task) {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* background-color: #d32f2f; */
 }
 
 /* edit button (pencil) */

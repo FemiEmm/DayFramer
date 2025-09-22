@@ -3,14 +3,12 @@
   <div class="card-wrap">
     <div class="card-glow"></div>
     <div class="card">
-      <div class="row between">
-        <div class="row gap">
-          <span class="dot dot-green"></span>
-          <span class="chip-text">Focus mode</span>
-        </div>
+      <!-- Header -->
+      <div class="row header-row">
         <div class="muted">{{ todayLabel }}</div>
       </div>
 
+      <!-- Stats -->
       <div class="stats">
         <div class="avatar">
           <img :src="currentMoodSrc" alt="" />
@@ -18,6 +16,7 @@
         <div class="big right">{{ completed }} / {{ total }} tasks</div>
       </div>
 
+      <!-- Next up -->
       <div class="mini">
         <div class="mini-top">Next up · {{ nextTime || '—' }}</div>
         <div class="mini-main">
@@ -45,17 +44,22 @@
         </div>
       </div>
 
+      <!-- Task list -->
       <div class="tasklist">
         <template v-if="allTasks.length">
           <ul class="tlist">
+            <!-- Columns: Header (title) | Content (note) | Date | ✓/✕ -->
             <li v-for="(t, i) in allTasks" :key="t.id || i" class="trow">
-              <span class="tbullet">•</span>
-              <span class="ttext" :title="t.title">
-                <strong class="ttitle">{{ t.title }}</strong>
-                <span v-if="t.note" class="tnote"> — {{ t.note }}</span>
-              </span>
-              <span class="ttime">{{ t.time || 'All-day' }}</span>
-              <div class="actions">
+              <div class="cell head" :title="t.title">
+                {{ t.title }}
+              </div>
+              <div class="cell body" :title="t.note || ''">
+                {{ t.note || '—' }}
+              </div>
+              <div class="cell date">
+                {{ t.date }}
+              </div>
+              <div class="cell actions">
                 <button
                   type="button"
                   class="action-btn yes"
@@ -83,11 +87,25 @@
         </template>
       </div>
 
-      <div class="reminder row gap">
-        <span class="dot dot-amber"></span>
-        <div>
-          <div class="rem-title">Reminder</div>
-          <div class="rem-sub">Stand up &amp; stretch · 2 min</div>
+      <!-- Plan (replaces reminder). Shows Personal and/or Team for current slot.
+           Hidden entirely if neither exists. -->
+      <div v-if="personalPlanNow || teamPlanNow" class="plan-col">
+        <div v-if="personalPlanNow" class="plan-line" :title="personalPlanNow.title">
+          <div class="plan-left">
+            <span class="plan-slot">{{ personalPlanNow.slot }}</span>
+            <span class="dash">—</span>
+            <span class="plan-text">{{ personalPlanNow.title }}</span>
+          </div>
+          <div class="plan-day">{{ todayDow }}</div>
+        </div>
+
+        <div v-if="teamPlanNow" class="plan-line" :title="teamPlanNow.title">
+          <div class="plan-left">
+            <span class="plan-slot">{{ teamPlanNow.slot }}</span>
+            <span class="dash">—</span>
+            <span class="plan-text">{{ teamPlanNow.title }}</span>
+          </div>
+          <div class="plan-day">{{ todayDow }}</div>
         </div>
       </div>
     </div>
@@ -106,6 +124,7 @@ import letsGoImg from "@/assets/moods/lets-go.png";
 import godmodeImg from "@/assets/moods/godmode.png";
 
 type TaskStatus = "done" | "not_done";
+
 interface TaskRow {
   id: string;
   user_id: string;
@@ -131,6 +150,20 @@ interface Task {
   status: TaskStatus;
 }
 
+type Slot = "Morning" | "Afternoon" | "Night";
+type Day = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
+
+interface PlanRow {
+  id: string;
+  day_of_week: Day;
+  slot: Slot;
+  title: string;
+  notes: string | null;
+  created_at?: string;
+  owner_user_id?: string | null;
+  team_id?: string | null;
+}
+
 export default defineComponent({
   name: "TodayCard",
   setup() {
@@ -143,9 +176,12 @@ export default defineComponent({
     const todayISO = toISO(today);
 
     const userId = ref<string | null>(null);
+    const teamId = ref<string | null>(null);
+
     const tasks = ref<Task[]>([]);
     const loading = ref(true);
 
+    // --- helpers
     const toMin = (t?: string) => {
       if (!t) return -1;
       const [h, m] = (t || "").split(":").map(Number);
@@ -158,12 +194,35 @@ export default defineComponent({
       return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     };
 
-    async function loadUser() {
-      const { data } = await supabase.auth.getSession();
-      userId.value = data.session?.user.id ?? null;
+    function dowLabel(d: Date): Day {
+      return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] as Day;
+    }
+    const todayDow = dowLabel(today);
+
+    function currentSlot(): Slot {
+      const h = new Date().getHours();
+      if (h < 12) return "Morning";
+      if (h < 18) return "Afternoon";
+      return "Night";
     }
 
-    async function loadToday() {
+    // --- identity
+    async function loadIdentity() {
+      const { data } = await supabase.auth.getSession();
+      userId.value = data.session?.user.id ?? null;
+
+      if (userId.value) {
+        const { data: mems } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", userId.value)
+          .order("created_at", { ascending: true });
+        teamId.value = mems?.[0]?.team_id ?? null;
+      }
+    }
+
+    // --- tasks
+    async function loadTodayTasks() {
       if (!userId.value) { tasks.value = []; loading.value = false; return; }
       loading.value = true;
 
@@ -206,16 +265,57 @@ export default defineComponent({
       }
     }
 
+    // --- plan (personal + team) for current slot
+    const personalPlanNow = ref<PlanRow | null>(null);
+    const teamPlanNow = ref<PlanRow | null>(null);
+
+    async function loadPlansForNow() {
+      personalPlanNow.value = null;
+      teamPlanNow.value = null;
+      if (!userId.value) return;
+
+      const slot = currentSlot();
+
+      // personal
+      const { data: pData } = await supabase
+        .from("personal_plan_entries")
+        .select("*")
+        .eq("owner_user_id", userId.value)
+        .eq("day_of_week", todayDow)
+        .eq("slot", slot)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      personalPlanNow.value = (pData && pData[0]) ? (pData[0] as PlanRow) : null;
+
+      // team
+      if (teamId.value) {
+        const { data: tData } = await supabase
+          .from("team_plan_entries")
+          .select("*")
+          .eq("team_id", teamId.value)
+          .eq("day_of_week", todayDow)
+          .eq("slot", slot)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        teamPlanNow.value = (tData && tData[0]) ? (tData[0] as PlanRow) : null;
+      }
+    }
+
+    // --- lifecycle
     let off: (() => void) | undefined;
     onMounted(async () => {
-      await loadUser();
-      await loadToday();
+      await loadIdentity();
+      await loadTodayTasks();
+      await loadPlansForNow();
       off = onTasksUpdated(({ date }) => {
-        if (!date || date === todayISO) loadToday();
+        if (!date || date === todayISO) loadTodayTasks();
       });
     });
     onBeforeUnmount(() => { off?.(); });
 
+    // --- derived
     const allTasks = computed(() => tasks.value);
 
     const nowMins = () => {
@@ -265,6 +365,7 @@ export default defineComponent({
 
     return {
       todayLabel,
+      todayDow,
       total,
       completed,
       nextTitle,
@@ -273,13 +374,14 @@ export default defineComponent({
       allTasks,
       setStatus,
       currentMoodSrc,
+      personalPlanNow,
+      teamPlanNow,
     };
   },
 });
 </script>
 
 <style scoped>
-/* your existing styles unchanged */
 .card-wrap { --card-w: 460px; --card-h: 540px; }
 
 .card-glow {
@@ -297,12 +399,13 @@ export default defineComponent({
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   box-shadow: 0 40px 120px -20px rgba(0,0,0,0.25);
   padding: 20px; border: 1px solid rgba(255,255,255,0.6);
- background-color: rgba(var(--frame1-color), 0.3);
-
+  background-color: rgba(var(--frame1-color), 0.3);
 }
+
 .row { display: flex; align-items: center; }
 .row.gap { gap: 8px; }
-.row.between { justify-content: space-between; }
+/* Header row: left-aligned */
+.header-row { justify-content: flex-start; }
 
 .stats {
   display: flex;
@@ -323,10 +426,6 @@ export default defineComponent({
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.dot { width: 10px; height: 10px; border-radius: 50%; }
-.dot-green { background: #22c55e; }
-.dot-amber { background: #f59e0b; }
-.chip-text { font-size: 12px; font-weight: 600; color: #3a3a3a; }
 .muted { font-size: 12px; color: #7a7a7a; }
 
 .mini {
@@ -363,10 +462,9 @@ export default defineComponent({
 .action-btn.yes.active { background: #eafff0; color: #16a34a; border-color: #16a34a; }
 .action-btn.no.active  { background: #ffecec; color: #d32f2f; border-color: #d32f2f; }
 
-.tasklist { 
-   max-width: 500px;
-}
+.tasklist { max-width: 500px; }
 
+/* Scrollable list */
 .tlist {
   --row-h: 48px;
   --gap: 6px;
@@ -382,11 +480,12 @@ export default defineComponent({
 }
 .tlist::-webkit-scrollbar { display: none; }
 
+/* Row columns: Header | Content | Date | Actions */
 .trow {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: 1.4fr 2fr 120px auto;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
   color: #222;
   background: rgba(255,255,255,0.7);
@@ -394,12 +493,13 @@ export default defineComponent({
   border-radius: 10px;
   padding: 8px 10px;
   min-height: var(--row-h);
+  text-align: left;
 }
-.tbullet { width: 10px; text-align: center; opacity: .6; }
-.ttext { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ttitle { font-weight: 700; }
-.tnote { color: #6b7280; font-weight: 400; display: inline-block; max-width: 40ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ttime { font-size: 12px; color: #667085; margin-left: 8px; white-space: nowrap; }
+.cell { min-width: 0; }
+.cell.head { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell.body { color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell.date { font-size: 12px; color: #667085; white-space: nowrap; text-align: left; }
+.cell.actions { display: flex; align-items: center; gap: 6px; justify-self: end; }
 
 .empty {
   font-size: 13px;
@@ -410,27 +510,71 @@ export default defineComponent({
   padding: 12px;
 }
 
-.reminder {
-  margin-top: auto;
-  border: 1px solid #ececec;
-  background: rgba(255,255,255,0.75); border-radius: 16px; padding: 10px 12px;
+/* ---- Plan section (replaces reminder) ---- */
+.plan-col {
+  margin-top: auto; /* stick towards bottom like the old reminder */
+  display: grid;
+  gap: 8px;
 }
-.rem-title { font-weight: 600; font-size: 14px; color: #222; }
-.rem-sub { font-size: 12px; color: #7a7a7a; }
 
-/* Hover grow + tilt */
+/* single line: SLOT — TEXT ......... DAY (right end) */
+.plan-line {
+  border: 1px solid #ececec;
+  background: rgba(255,255,255,0.75);
+  border-radius: 16px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* push day to the far right */
+  gap: 12px;
+}
+
+.plan-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.plan-slot {
+  font-weight: 700;
+  color: #222;
+  white-space: nowrap;
+}
+.dash { opacity: .6; color: #6b7280; }
+.plan-text {
+  color: #222;
+  font-size: 14px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.plan-day {
+  margin-left: auto;
+  font-size: 12px;
+  color: #667085;
+  font-weight: 700;
+  text-align: right; /* ensure right alignment */
+  min-width: 3ch;   /* keeps it tidy for 3-letter days */
+}
+
+/* Hover grow + tilt — include plan-line */
 .mini,
 .trow,
-.reminder {
+.plan-line {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   transform-origin: center;
 }
 .mini:hover,
 .trow:hover,
-.reminder:hover {
+.plan-line:hover {
   transform: scale(1.03) rotateY(13deg);
   box-shadow: 0 8px 20px rgba(0,0,0,0.12);
 }
 
-@media (max-width: 420px) { .card-wrap, .card { width: 100%; } }
+@media (max-width: 560px) {
+  .trow { grid-template-columns: 1fr; align-items: start; }
+  .cell.actions { justify-self: start; }
+}
+@media (max-width: 420px) {
+  .card-wrap, .card { width: 100%; }
+}
 </style>

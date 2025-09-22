@@ -10,17 +10,11 @@
       <p v-if="err" class="err">{{ err }}</p>
     </form>
 
-    <!-- Email confirmation -> profile completion -->
-    <div v-else>
-      <div v-if="needsProfile" class="panel">
-        <h2>Finish setting up your account</h2>
-        <ProfileForm @saved="handleProfileSaved" />
-        <!-- no error shown for the check; we fall back to the form -->
-      </div>
-
-      <div v-else class="panel">
-        <h2>{{ status }}</h2>
-      </div>
+    <!-- Email confirmation / magic link -> profile completion or redirect -->
+    <div v-else class="panel">
+      <h2>{{ status }}</h2>
+      <ProfileForm v-if="needsProfile" @saved="handleProfileSaved" />
+      <p v-if="err" class="err">{{ err }}</p>
     </div>
   </div>
 </template>
@@ -28,7 +22,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { supabase } from "@/lib/supabase"; // or "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase";
 import ProfileForm from "./ProfileForm.vue";
 
 const router = useRouter();
@@ -36,7 +30,7 @@ const route = useRoute();
 
 const isReset = ref(false);
 const needsProfile = ref(false);
-const status = ref("Confirming your email…");
+const status = ref("Finalizing sign-in…");
 const saving = ref(false);
 const err = ref("");
 const msg = ref("");
@@ -44,29 +38,41 @@ const msg = ref("");
 const newPassword = ref("");
 const confirm = ref("");
 
-const redirect = (route.query.redirect as string) || "/home";
+// sanitize redirect: only allow internal paths
+const rawRedirect = (route.query.redirect as string) || "/home";
+const redirect = rawRedirect.startsWith("/") ? rawRedirect : "/home";
 
 onMounted(async () => {
+  const qs = window.location.search || "";
   const hash = window.location.hash || "";
 
-  // Password reset?
+  try {
+    // 1) PKCE / OAuth / magic link with ?code=...
+    if (qs.includes("code=")) {
+      await supabase.auth.exchangeCodeForSession(window.location.href);
+    }
+  } catch (e) {
+    err.value = "We couldn’t complete sign-in. Please try again.";
+    await router.replace({ path: "/", query: { mode: "signin" } });
+    return;
+  }
+
+  // 2) Password recovery flow (hash tokens + type=recovery)
   if (hash.includes("type=recovery")) {
     isReset.value = true;
     status.value = "Set a new password";
     return;
   }
 
-  // Confirmed sign-up / magic link
-  const { data } = await supabase.auth.getSession();
-  const user = data.session?.user;
+  // 3) We should now have a session
+  const { data: sess } = await supabase.auth.getSession();
+  const user = sess.session?.user;
   if (!user) {
-    status.value = "No active session. Redirecting to sign in…";
-    setTimeout(() => router.replace({ path: "/", query: { mode: "signin" } }), 900);
+    await router.replace({ path: "/", query: { mode: "signin" } });
     return;
   }
 
-  // Try to see if a profile exists — but if anything goes wrong, just show the form.
-  let profileExists = false;
+  // 4) Check profile; if missing, show the form
   try {
     const { data: row, error } = await supabase
       .from("profiles")
@@ -74,16 +80,16 @@ onMounted(async () => {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!error && row) profileExists = true;
-  } catch (_) {
-    // ignore and treat as no profile
-  }
-
-  if (profileExists) {
-    status.value = "Welcome back. Taking you in…";
-    setTimeout(() => router.replace(redirect), 600);
-  } else {
-    needsProfile.value = true;        // <= show the form right now
+    if (!error && row) {
+      status.value = "Welcome back. Taking you in…";
+      setTimeout(() => router.replace(redirect), 400);
+    } else {
+      needsProfile.value = true;
+      status.value = "Tell us a bit about you";
+    }
+  } catch {
+    // If the check fails, just show the form
+    needsProfile.value = true;
     status.value = "Tell us a bit about you";
   }
 });
@@ -119,7 +125,7 @@ function handleProfileSaved(next: "onboarding" | "home") {
 </script>
 
 <style scoped>
-.wrap { max-width: 560px; margin: 64px auto; padding: 0 16px; }
+.wrap { max-width: 960px; margin: 4px auto; padding: 20px 16px; }
 .panel { background: #fff; border: 1px solid #eee; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(0,0,0,.08); text-align: center; }
 .input { width: 100%; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 12px; margin-top: 10px; }
 .btn { margin-top: 12px; padding: 12px 16px; border-radius: 12px; border: 1px solid transparent; background: var(--button-color); color: var(--secondary-text-color); cursor: pointer; }

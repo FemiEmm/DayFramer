@@ -78,7 +78,7 @@ export default defineComponent({
   setup() {
     // Headlines rotate every 30 seconds
     const headlines = [
-      "Have you<br>planned your day?",
+      "Have you<br>planned your <br> day?",
       "When are you<br>going grocery<br>shopping?",
       "What’s your<br>top priority today?",
       "Don’t forget to<br>take a break.<br>relax and rest.",

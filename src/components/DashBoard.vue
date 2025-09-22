@@ -1,73 +1,77 @@
 <template>
-  <div class="dashboard">
-    <!-- Dayframe Logo and Text -->
-    <ul class="title" @click="navigateTo('Onboarding')">
-      <i class="icon fa-solid fa-calendar-days"></i>
-      <span class="text">Dayframe</span>
-    </ul>
+  <nav class="dashboard" aria-label="Primary">
+    <div class="brand">
+      <button @click="navigateTo('Onboarding')" class="navbtn" aria-label="Dayframe">
+        <i class="icon fa-solid fa-calendar-days" aria-hidden="true"></i>
+        <span class="text">Dayframe</span>
+      </button>
+    </div>
 
-    <hr />
+    <hr class="sep-line" />
 
-    <!-- Navigation Menu -->
     <ul class="menu">
       <li>
-        <button @click="navigateTo('Homepage')">
-          <i class="icon fa fa-home"></i>
+        <button @click="navigateTo('Homepage')" class="navbtn" aria-label="Home">
+          <i class="icon fa fa-home" aria-hidden="true"></i>
           <span class="text">Home</span>
         </button>
       </li>
       <li>
-        <button @click="navigateTo('Dayframer')">
-          <i class="icon fa fa-user"></i>
+        <button @click="navigateTo('Dayframer')" class="navbtn" aria-label="Dayframer">
+          <i class="icon fa fa-user" aria-hidden="true"></i>
           <span class="text">Dayframer</span>
         </button>
       </li>
       <li>
-        <button @click="navigateTo('Monthly')">
-          <i class="icon fa fa-calendar"></i>
+        <button @click="navigateTo('Monthly')" class="navbtn" aria-label="Monthly">
+          <i class="icon fa fa-calendar" aria-hidden="true"></i>
           <span class="text">Monthly</span>
         </button>
       </li>
       <li>
-        <button @click="navigateTo('Homepage')">
-          <i class="icon fa fa-tasks"></i>
-          <span class="text">MyTodo</span>
+        <button @click="navigateTo('TeamManagement')" class="navbtn" aria-label="Team">
+          <i class="icon fa fa-cogs" aria-hidden="true"></i>
+          <span class="text">Team</span>
         </button>
       </li>
       <li>
-        <button @click="toggleTheme" class="theme-toggle">
-          <i class="icon fa fa-adjust"></i>
+        <button @click="navigateTo('PlanPage')" class="navbtn" aria-label="Plan">
+          <i class="icon fa fa-tasks" aria-hidden="true"></i>
+          <span class="text">Plan</span>
+        </button>
+      </li>
+
+      <li>
+        <button @click="toggleTheme" class="navbtn" aria-label="Toggle theme">
+          <i class="icon fa fa-adjust" aria-hidden="true"></i>
           <span class="text">Theme</span>
         </button>
       </li>
       <li>
-        <button @click="navigateTo('TeamManagement')">
-          <i class="icon fa fa-cogs"></i>
-          <span class="text">Admin</span>
-        </button>
-      </li>
-
-      <!-- Settings now routes to SettingsPage -->
-      <li>
-        <button @click="goSettings" class="settings">
-          <i class="icon fa fa-cog"></i>
+        <button @click="goSettings" class="navbtn" aria-label="Settings">
+          <i class="icon fa fa-cog" aria-hidden="true"></i>
           <span class="text">Settings</span>
         </button>
       </li>
     </ul>
 
-    <hr />
+    <hr class="sep-line" />
 
-    <!-- Sign Out Button -->
-    <div class="bottom-container">
-      <button @click="openSignOutModal" class="sign-out">
-        <i class="icon fa fa-sign-out-alt"></i>
+    <div class="bottom">
+      <button @click="openSignOutModal" class="navbtn" aria-label="Sign out">
+        <i class="icon fa fa-sign-out-alt" aria-hidden="true"></i>
         <span class="text">Sign Out</span>
       </button>
     </div>
 
-    <!-- Modal for Sign Out -->
-    <div v-if="showSignOutModal" class="modal-overlay" @click="closeSignOutModal">
+    <div
+      v-if="showSignOutModal"
+      class="modal-overlay"
+      @click="closeSignOutModal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sign out"
+    >
       <div class="modal" @click.stop>
         <h3>Sign Out</h3>
         <p>Are you sure you want to sign out?</p>
@@ -75,17 +79,24 @@
           @click="signOut"
           class="confirm-button"
           :disabled="signingOut"
+          :aria-busy="signingOut"
         >
           {{ signingOut ? 'Signing out…' : 'Yes' }}
         </button>
-        <button @click="closeSignOutModal" class="cancel-button" :disabled="signingOut">No</button>
+        <button
+          @click="closeSignOutModal"
+          class="cancel-button"
+          :disabled="signingOut"
+        >
+          No
+        </button>
       </div>
     </div>
-  </div>
+  </nav>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { supabase } from "../lib/supabase";
 
@@ -98,39 +109,57 @@ export default defineComponent({
     const signingOut = ref(false);
 
     const navigateTo = (routeName: string) => router.push({ name: routeName });
-    const goSettings = () => router.push({ name: "Settings" }); // <-- routes to Settings page
-
+    const goSettings  = () => router.push({ name: "Settings" });
     const toggleTheme = () => document.documentElement.classList.toggle("dark-theme");
 
-    const openSignOutModal = () => { showSignOutModal.value = true; };
+    const openSignOutModal  = () => { showSignOutModal.value = true; };
     const closeSignOutModal = () => { if (!signingOut.value) showSignOutModal.value = false; };
 
-    const goWelcome = async () => {
+    const purgeSupabaseTokens = () => {
       try {
-        await router.replace({ name: "Welcome", query: { mode: "signin" } });
-      } catch {
-        window.location.href = "/?mode=signin";
-      }
+        const keys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("sb-") && k.includes("auth-token")) keys.push(k);
+        }
+        keys.forEach((k) => localStorage.removeItem(k));
+      } catch {}
     };
 
     const signOut = async () => {
+      if (signingOut.value) return;
       signingOut.value = true;
+
+      showSignOutModal.value = false;
+      await nextTick();
+
+      let localDone = false;
+      supabase.auth
+        .signOut({ scope: "local" })
+        .then(() => { localDone = true; })
+        .catch(() => { localDone = true; });
+
+      setTimeout(() => {
+        if (!localDone) purgeSupabaseTokens();
+      }, 800);
+
+      setTimeout(() => {
+        supabase.auth.signOut().catch(() => {});
+      }, 0);
+
+      const target = { name: "Welcome", query: { mode: "signin", _r: String(Date.now()) } };
       try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.error("Sign-out error (continuing to redirect):", e);
+        await router.replace(target);
+      } catch {
+        window.location.replace(`/?mode=signin&_r=${Date.now()}`);
       } finally {
         signingOut.value = false;
-        showSignOutModal.value = false;
-        await goWelcome();
       }
     };
 
     return {
-      // state
       showSignOutModal,
       signingOut,
-      // actions
       navigateTo,
       goSettings,
       toggleTheme,
@@ -143,25 +172,36 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* ===== Shell ===== */
 .dashboard {
   position: fixed;
-  top: 0;
-  left: 0;
+  top: 0; left: 0;
   width: 80px;
   height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  transition: width 0.3s ease;
   background-color: var(--background-color);
   color: var(--primary-text-color);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.04);
   overflow: hidden;
   white-space: nowrap;
   z-index: 1000;
   padding: 0 20px;
+  display: flex;
+  flex-direction: column;
 }
+.dashboard:hover { width: 150px; }
 
-hr {
+/* Top brand, middle menu, bottom sign-out */
+.brand { padding-top: 20px; }
+.menu  {
+  list-style: none; margin: 0; padding: 20px 0;
+  display: flex; flex-direction: column; gap: 8px;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.bottom { padding-bottom: 10px; }
+
+/* Separator */
+.sep-line {
   background-color: var(--button-color);
   border: none;
   height: 2px;
@@ -170,87 +210,79 @@ hr {
   transition: background-color 0.3s ease;
 }
 
-.dashboard:hover { width: 150px; }
-
-.title {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-  margin-top: 20px;
+/* Shared button style (brand, items, signout all match) */
+.navbtn {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
   padding: 10px;
-  cursor: pointer;
-  transition: color 0.3s ease, background-color 0.3s ease;
+  border: none; background: none;
   color: var(--button-color);
-}
-.title:hover {
-  color: var(--button-hover-color);
-  background-color: var(--button-color);
-  border-radius: 5px;
-}
-
-.menu { list-style: none; padding: 0; margin: 0; flex-grow: 1; padding-top: 100px; }
-.menu li { display: flex; align-items: center; margin: 10px 0; }
-
-.menu button {
-  display: flex;
-  font-size: 14px;
-  background: none;
-  border: none;
-  color: inherit;
-  font-weight: 600;
+  font-size: 14px; font-weight: 600;
   cursor: pointer;
-  text-decoration: none;
-  transition: color 0.3s ease, background-color 0.3s ease;
-  color: var(--button-color);
-  padding: 10px;
-  border-radius: 5px;
+  border-radius: 8px;
+  transition: color .2s ease, background-color .2s ease, transform .12s ease;
 }
-.menu button:hover { color: var(--button-hover-color); font-size: 16px; }
+.navbtn:hover { color: var(--button-hover-color); transform: translateY(-1px); }
 
-.icon { font-size: 1.2em; margin-right: 10px; width: 24px; text-align: center; }
-
+.icon { font-size: 1.2em; width: 24px; text-align: center; }
 .text {
   opacity: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
   transform: translateX(-10px);
+  transition: opacity .25s ease, transform .25s ease;
 }
 .dashboard:hover .text { opacity: 1; transform: translateX(0); }
 
-.bottom-container { margin-top: auto; }
+/* ===== Mobile: bottom bar (icons only); brand hidden; signout at end ===== */
+@media (max-width: 768px) {
+  .dashboard {
+    top: auto; bottom: 0; right: 0;
+    width: 100%; height: 64px;
+    padding: 0 8px;
+    box-shadow: 0 -6px 20px rgba(0,0,0,.12);
+    flex-direction: row;
+    align-items: center;
+  }
 
-.sign-out {
-  display: flex;
-  align-items: center;
-  color: var(--button-color);
-  font-weight: bold;
-  text-decoration: none;
-  cursor: pointer;
-  padding: 10px;
-  border-radius: 5px;
+  .brand, .sep-line { display: none; }
+
+  .menu {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0;
+    gap: 4px;
+    flex: 1 1 auto;
+  }
+  .text { display: none !important; }
+  .navbtn { padding: 10px; border-radius: 999px; font-size: 12px; }
+
+  .bottom {
+    padding: 0 4px 0 6px;
+  }
 }
-.sign-out:hover { color: var(--button-hover-color); background-color: var(--button-color); }
 
-/* Modal */
+/* ===== Modal ===== */
 .modal-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
+  position: fixed; inset: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  display: flex; justify-content: center; align-items: center;
-  z-index: 1000;
+  display: grid; place-items: center;
+  z-index: 1500;
 }
 .modal {
-  background-color: var(--background-color);
-  padding: 20px; border-radius: 8px;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
-  text-align: center; width: 300px;
+  width: min(92vw, 320px);
+  background: var(--background-color);
+  color: var(--primary-text-color);
+  padding: 20px; border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.2);
+  text-align: center;
 }
 .confirm-button, .cancel-button {
-  padding: 10px 15px; border: none; border-radius: 5px;
-  font-weight: bold; cursor: pointer; margin: 5px;
+  padding: 10px 14px;
+  border: none; border-radius: 10px;
+  font-weight: 800; cursor: pointer; margin: 6px;
 }
 .confirm-button { background-color: var(--button-color); color: var(--primary-text-color); }
-.cancel-button { background-color: var(--button-hover-color); color: white; }
-.confirm-button[disabled] { opacity: 0.7; cursor: not-allowed; }
-.confirm-button:hover { background-color: var(--button-hover-color); }
-.cancel-button:hover { background-color: var(--button-color); }
+.cancel-button  { background-color: var(--button-hover-color); color: #fff; }
+.confirm-button[disabled] { opacity: .7; cursor: not-allowed; }
+.confirm-button:hover:not([disabled]), .cancel-button:hover { filter: brightness(0.95); }
 </style>

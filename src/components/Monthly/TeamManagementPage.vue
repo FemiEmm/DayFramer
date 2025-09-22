@@ -1,18 +1,29 @@
-<!-- src/components/TeamPage/TeamManagementPage.vue -->
 <template>
-  <!-- ✅ Dashboard on top -->
   <DashBoard />
 
-  <!-- ✅ Page background + grid like your DayFramer layout -->
   <section class="df-wrap">
     <div class="dayframer">
-      <!-- LEFT CARD -->
+      <!-- TOP (formerly RIGHT) -->
+      <main class="df-right">
+        <section class="right-top no-scrollbar">
+          <div class="metrics-list">
+            <TMMetrics
+              v-for="member in members"
+              :key="member.user_id"
+              :displayName="member.display_name"
+              :userId="member.user_id"
+              :tasks="tasks"
+            />
+          </div>
+        </section>
+      </main>
+
+      <!-- BOTTOM (formerly LEFT) -->
       <aside class="df-left">
-        <section class="left-top">
+        <section class="left-top no-scrollbar">
           <h2 class="section-title">Team Tasks</h2>
         </section>
-
-        <section class="left-bottom">
+        <section class="left-bottom no-scrollbar">
           <TMTasks
             :tab="tab"
             :monthYM="monthYM"
@@ -32,20 +43,6 @@
           />
         </section>
       </aside>
-
-      <!-- RIGHT CARD -->
-      <main class="df-right">
-        <section class="right-top">
-          <TMMetrics
-            :displayName="myName"
-            :tasks="tasks"
-            :userId="currentUserId"
-          />
-        </section>
-        <section class="right-bottom">
-          <!-- keep for future widgets (e.g., calendar, summaries) -->
-        </section>
-      </main>
     </div>
   </section>
 </template>
@@ -57,58 +54,62 @@ import TMTasks from "./TMTasks.vue";
 import TMMetrics from "./TMMetrics.vue";
 import DashBoard from "@/components/DashBoard.vue";
 
-type Member = { user_id: string; display_name: string; role: "owner"|"admin"|"member" };
+type Member = {
+  user_id: string;
+  display_name: string;
+  role: "owner" | "admin" | "member";
+};
+
 type TaskRow = {
   id: string;
   user_id: string;
   title: string;
   note: string | null;
   type: string | null;
-  task_date: string;        // YYYY-MM-DD
-  task_time: string | null; // HH:MM[:SS]
+  task_date: string;
+  task_time: string | null;
   reminder_time: string | null;
   priority: number | null;
   status: string | null;
-  assigned_to: string | null; // display name snapshot
+  assigned_to: string | null;
 };
 
 const loading = ref(false);
 const tasks = ref<TaskRow[]>([]);
 const members = ref<Member[]>([]);
-const teamId = ref<string|null>(null);
+const teamId = ref<string | null>(null);
 
 // current user
 const currentUserId = ref<string>("");
 const myName = ref<string>("Me");
 
-// UI state shared with TMTasks
-const tab = ref<"monthly"|"yearly">("monthly");
-const monthYM = ref<string>(new Date().toISOString().slice(0,7)); // YYYY-MM
+// UI state
+const tab = ref<"monthly" | "yearly">("monthly");
+const monthYM = ref<string>(new Date().toISOString().slice(0, 7));
 const yearNum = ref<number>(new Date().getFullYear());
 
-// filters
-const filterMemberId = ref<string|null>(null);
-const filterType = ref<string|null>(null);
+const filterMemberId = ref<string | null>(null);
+const filterType = ref<string | null>(null);
+
 const typeOptions = [
-  "Meeting","Health","Home","Home & Household","Health & Wellness",
-  "Family","Finance & Bills","Learning and Growth","Appointments","Others"
+  "Meeting", "Health", "Home", "Home & Household", "Health & Wellness",
+  "Family", "Finance & Bills", "Learning and Growth", "Appointments", "Others"
 ];
 
-// derived range (internal)
 const startISO = ref<string>("");
-const endISO   = ref<string>("");
+const endISO = ref<string>("");
 
 function computeRange() {
   if (tab.value === "monthly") {
     const [y, m] = monthYM.value.split("-").map(Number);
-    const start = new Date(y, m-1, 1);
+    const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 0);
-    startISO.value = start.toISOString().slice(0,10);
-    endISO.value   = end.toISOString().slice(0,10);
+    startISO.value = start.toISOString().slice(0, 10);
+    endISO.value = end.toISOString().slice(0, 10);
   } else {
     const y = yearNum.value;
-    startISO.value = new Date(y, 0, 1).toISOString().slice(0,10);
-    endISO.value   = new Date(y, 11, 31).toISOString().slice(0,10);
+    startISO.value = new Date(y, 0, 1).toISOString().slice(0, 10);
+    endISO.value = new Date(y, 11, 31).toISOString().slice(0, 10);
   }
 }
 
@@ -119,7 +120,6 @@ async function loadMembersAndTeam() {
 
   currentUserId.value = uid;
 
-  // profile for display name
   const { data: prof } = await supabase
     .from("profiles")
     .select("id, display_name")
@@ -127,15 +127,17 @@ async function loadMembersAndTeam() {
     .maybeSingle();
   myName.value = prof?.display_name || "Me";
 
-  // memberships
   const { data: myMems } = await supabase
     .from("team_members")
     .select("team_id, role")
     .eq("user_id", uid);
 
   if (!myMems?.length) {
-    // just me
-    members.value = [{ user_id: uid, display_name: myName.value, role: "member" }];
+    members.value = [{
+      user_id: uid,
+      display_name: myName.value,
+      role: "member"
+    }];
     teamId.value = null;
     return;
   }
@@ -149,13 +151,14 @@ async function loadMembersAndTeam() {
     .eq("team_id", tId)
     .order("created_at", { ascending: true });
 
-  const ids = (rawMembers ?? []).map(r => r.user_id);
+  const ids = rawMembers?.map(r => r.user_id) || [];
   const { data: profs } = await supabase
     .from("profiles")
     .select("id, display_name")
     .in("id", ids);
 
   const map = new Map((profs ?? []).map(p => [p.id, p.display_name || "User"]));
+
   members.value = (rawMembers ?? []).map(r => ({
     user_id: r.user_id,
     role: r.role as Member["role"],
@@ -167,7 +170,7 @@ async function loadData() {
   loading.value = true;
   computeRange();
 
-  const memberIds   = members.value.map(m => m.user_id);
+  const memberIds = members.value.map(m => m.user_id);
   const memberNames = members.value.map(m => m.display_name);
 
   if (filterMemberId.value) {
@@ -178,7 +181,6 @@ async function loadData() {
     }
   }
 
-  // A) tasks explicitly assigned by display name (compat with current schema)
   let resAssigned: TaskRow[] = [];
   if (memberNames.length) {
     const { data, error } = await supabase
@@ -190,7 +192,6 @@ async function loadData() {
     if (!error) resAssigned = (data ?? []) as TaskRow[];
   }
 
-  // B) tasks created by those members (ID-based)
   let resCreated: TaskRow[] = [];
   if (memberIds.length) {
     const { data, error } = await supabase
@@ -202,7 +203,6 @@ async function loadData() {
     if (!error) resCreated = (data ?? []) as TaskRow[];
   }
 
-  // merge + optional type filter + sort
   const byId = new Map<string, TaskRow>();
   for (const r of [...resAssigned, ...resCreated]) {
     if (filterType.value && r.type !== filterType.value) continue;
@@ -210,7 +210,8 @@ async function loadData() {
   }
 
   tasks.value = Array.from(byId.values()).sort((a, b) => {
-    if (a.task_date === b.task_date) return (a.task_time || "").localeCompare(b.task_time || "");
+    if (a.task_date === b.task_date)
+      return (a.task_time || "").localeCompare(b.task_time || "");
     return a.task_date.localeCompare(b.task_date);
   });
 
@@ -224,7 +225,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* --- Copied visual language from your DayFramer page --- */
 .df-wrap {
   width: 100%;
   min-height: 100vh;
@@ -238,12 +238,14 @@ onMounted(async () => {
   padding: 20px 0 40px;
 }
 
+/* STACKED LAYOUT: right (top) then left (bottom) */
 .dayframer {
   width: 100%;
   padding-left: 100px;
-  padding-right: 0;
+  padding-right: 100px;
   display: grid;
-  grid-template-columns: 7fr 3fr;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
   gap: 16px;
   position: relative;
   z-index: 1;
@@ -255,62 +257,75 @@ onMounted(async () => {
 .df-right {
   background: var(--background-color);
   border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.08);
+  padding: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
   position: relative;
   z-index: 2;
 }
 
-/* Left splits header + content (like your reference) */
+/* BOTTOM (formerly left) */
 .df-left {
   display: grid;
-  grid-template-rows: 20% 80%;
+  grid-template-rows: auto 1fr;
   height: 100%;
   overflow: hidden;
   row-gap: 8px;
-  padding: 50px; /* matches your example */
-}
-
-.left-top,
-.left-bottom { overflow: auto; }
-
-.df-left > section + section {
-  border-top: 1px solid var(--divider-color, #e6e6e6);
-  padding-top: 8px;
-}
-
-/* Right splits two panels (metrics on top, room below) */
-.df-right {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 8px;
-  height: 100%;
-  min-height: 0;
-}
-
-.df-right > section + section {
-  border-top: 1px solid var(--divider-color, #e6e6e6);
-  padding-top: 8px;
-}
-
-.right-top,
-.right-bottom {
-  overflow: auto;
-  border-radius: 8px;
+  padding: 0 50px 50px 50px;
 }
 
 .section-title {
-  margin: 0;
+  margin: 10px 0;
   font-weight: 800;
   font-size: 18px;
 }
 
-/* Keep children from forcing overflow */
+/* Make these sections scrollable… */
+.df-left, .left-bottom { min-height: 0; }
+.left-bottom { overflow: hidden; } /* TMTasks handles its own scroll */
+
+/* TOP (formerly right) */
+.df-right {
+  display: grid;
+  grid-template-rows: auto;
+  height: 100%;
+  min-height: 0;
+  padding: 20px 20px 12px;
+}
+
+.right-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: auto;
+  padding-top: 10px;
+  gap: 16px;
+}
+
+/* Hide scrollbars where used */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE/old Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.right-top.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.right-top.no-scrollbar::-webkit-scrollbar { display: none; }
+
+.metrics-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+/* Ensure children can scroll without forcing the page to scroll */
 .df-right > * { min-height: 0; }
 .df-left  > * { min-height: 0; }
 
-/* Responsive */
+/* Single-column everywhere; keep responsive niceties if needed */
 @media (max-width: 980px) {
-  .dayframer { grid-template-columns: 1fr; }
+  .dayframer { padding-left: 20px; padding-right: 20px; }
+  .df-left { padding: 0 20px 30px; }
 }
 </style>

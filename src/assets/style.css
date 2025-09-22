@@ -4,6 +4,7 @@
   --background-secondary : #111111;
   --background-gradient: linear-gradient(135deg, #ffffff, #e0f7fa); /* Light blue gradient */
   --button-color: #111111;
+  --secondary-button-color:#ffffff;
   --button-hover-color: #bb86fc;
   --frame1-color: #ffffff;
   --frame2-color: #ffcc00;
@@ -16,11 +17,12 @@
 /* Dark Theme */
 .dark-theme {
   --background-color: #121212;
-  --background-secondary : #bb86fc;
+  --background-secondary : #7b36cf;
   --background-gradient: linear-gradient(360deg, #000000, #222222); /* Black to gray gradient */
   --button-color: #bb86fc; /* Keep original button color */
+  --secondary-button-color:#ffffff;
   --button-hover-color: #3700b3; /* Keep original button hover color */
-  --frame1-color: #484848; /* Indigo for frame */
+  --frame1-color: #252525; /* Indigo for frame */
   --frame2-color: #e3d9ec; /* Bright purple for frame accents */
   --nav-bar-color: #2c003e; /* Deep purple for nav bar */
   --primary-text-color: #dcd6f7; /* Light lavender for readability */
