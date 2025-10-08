@@ -1,6 +1,6 @@
 <template>
   <div class="page-content">
-    <!-- BELOW HERO: put “Dayframer” text + icon where UserGreeting was -->
+    <!-- BELOW HERO: brand remains -->
     <section class="below-hero">
       <div class="user-greeting-wrapper">
         <div class="brand" aria-hidden="true">
@@ -14,25 +14,15 @@
     <section class="hero">
       <!-- LEFT -->
       <div class="hero-left">
-        <div class="badges">
-          <UiBadge icon="⏱️" label="Save 5–10 hrs/wk" />
-          <UiBadge icon="✨" label="Smart suggestions" />
-        </div>
-
         <transition name="fade" mode="out-in">
           <h1 class="hero-title" v-html="currentHeadline" :key="currentHeadline"></h1>
         </transition>
 
         <p class="hero-sub">
-          Stay on top of your tasks, take breaks when you need them, and let us handle the reminders.
+          Plan your day, map your week, and set clear monthly goals—all in one place.
         </p>
 
-        <div class="hero-ctas">
-          <button class="btn btn-primary" @click="showPlanModal = true">Plan My Day</button>
-          <button class="btn btn-secondary">Add Task</button>
-        </div>
-
-        <a href="#" class="hero-link">Need help? Visit the guide.</a>
+        <router-link class="hero-link" :to="{ name: 'Help' }">Need help? Visit the guide.</router-link>
       </div>
 
       <!-- RIGHT: AUTH PANEL -->
@@ -66,11 +56,6 @@
         </div>
       </div>
     </section>
-
-    <!-- PLAN MY DAY MODAL -->
-    <BaseModal v-model="showPlanModal" title="Plan My Day">
-      <PlanMyDayForm @submit="handlePlanSubmit" @cancel="showPlanModal = false" />
-    </BaseModal>
   </div>
 </template>
 
@@ -78,30 +63,23 @@
 import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
 import { useRoute } from "vue-router";
 
-import UiBadge from "@/components/HomePage/UiBadge.vue";
-import BaseModal from "@/components/Ui/BaseModal.vue";
-import PlanMyDayForm from "@/components/HomePage/PlanMyDayForm.vue";
-
-/* Auth components (same folder) */
+/* Auth components */
 import SignIn from "@/components/AuthPage/SignIn.vue";
 import SignUp from "@/components/AuthPage/SignUp.vue";
 
 export default defineComponent({
   name: "WelcomePage",
   components: {
-    UiBadge,
-    BaseModal,
-    PlanMyDayForm,
     SignIn,
     SignUp,
   },
   setup() {
     const headlines = [
-      "Have you<br>planned your day?",
-      "When are you<br>going grocery<br>shopping?",
-      "What’s your<br>top priority today?",
-      "Don’t forget to<br>take a break.<br>relax and rest.",
-      "Any tasks you <br>can finish in<br>5 minutes?",
+      "Welcome to <br>Dayframer.",
+      "Plan your <br>day with ease.",
+      "Own your <br>week’s priorities.",
+      "Set goals for <br>the month ahead.",
+      "Your time, <br>framed your way.",
     ];
     const idx = ref(0);
     const currentHeadline = ref(headlines[idx.value]);
@@ -121,12 +99,7 @@ export default defineComponent({
     );
     const redirect = (route.query.redirect as string) || undefined;
 
-    const showPlanModal = ref(false);
-    const handlePlanSubmit = (_payload: { date: string; title: string; time: string; priority: number }) => {
-      showPlanModal.value = false;
-    };
-
-    return { currentHeadline, showPlanModal, handlePlanSubmit, activeTab, redirect };
+    return { currentHeadline, activeTab, redirect };
   },
 });
 </script>
@@ -148,7 +121,7 @@ export default defineComponent({
   box-sizing: border-box;
 }
 
-/* BELOW HERO — same layout spot as previous UserGreeting */
+/* BELOW HERO — brand */
 .below-hero {
   display: flex;
   justify-content: space-between;
@@ -161,7 +134,7 @@ export default defineComponent({
 .user-greeting-wrapper {
   flex: 1;
   display: flex;
-  justify-content: flex-end; /* place on the right, like the old UserGreeting */
+  justify-content: flex-end;
 }
 
 .brand {
@@ -170,10 +143,9 @@ export default defineComponent({
   gap: 10px;
   padding: 10px 14px;
   background: var(--white);
-  /* border: 1px solid #ececec; */
   border-radius: 14px;
-  cursor: default;         /* no click effect */
-  user-select: none;       /* no selection flash */
+  cursor: default;
+  user-select: none;
 }
 .brand-icon { font-size: 22px; color: #111; }
 .brand-text { font-weight: 800; letter-spacing: 0.2px; }
@@ -190,7 +162,6 @@ export default defineComponent({
 }
 
 .hero-left { display: flex; flex-direction: column; }
-.badges { display: flex; gap: 12px; margin-bottom: 20px; }
 
 .hero-title {
   font-size: clamp(40px, 6vw, 72px);
@@ -202,16 +173,7 @@ export default defineComponent({
   text-align: left;
 }
 .hero-sub { margin-top: 16px; color: var(--subtext); font-size: 16px; max-width: 600px; text-align: left; }
-.hero-ctas { display: flex; gap: 12px; margin-top: 28px; }
 
-.btn {
-  padding: 12px 20px; border-radius: 999px; font-weight: 600; border: 1px solid transparent;
-  cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-}
-.btn-primary { color: var(--secondary-text-color); background-color: var(--button-color); box-shadow: 0 10px 24px rgba(0,0,0,.18); }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 36px rgba(0,0,0,.22); background-color: var(--button-hover-color); color: var(--primary-text-color); }
-.btn-secondary { background: var(--white); color: #111; border-color: #e8e8e8; box-shadow: 0 4px 12px rgba(0,0,0,.06); }
-.btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(0,0,0,.12); }
 .hero-link { margin-top: 10px; color: #7a7a7a; font-size: 14px; text-decoration: underline; width: fit-content; }
 
 .hero-right { justify-self: center; }

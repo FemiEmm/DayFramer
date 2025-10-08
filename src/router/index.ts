@@ -14,6 +14,7 @@ import WIPPage from "@/components/WorkInProgress/WorkInProgress.vue";
 import NotFound from "@/components/WorkInProgress/NotFound.vue";
 import SettingsPage from "@/components/SettingsPage/SettingsPage.vue";
 import PlanPage from "@/components/Todo/PlanPage.vue";
+import HelpPage from "@/components/WorkInProgress/HelpPage.vue";
 
 const routes: Array<RouteRecordRaw> = [
   { path: "/", name: "Welcome", component: WelcomePage },
@@ -50,6 +51,9 @@ const routes: Array<RouteRecordRaw> = [
 
   // Team Management
   { path: "/team/manage", name: "TeamManagement", component: TeamManagementPage, meta: { requiresAuth: true } },
+
+  { path: "/help", name: "Help", component: HelpPage },
+
 
   // WIP + 404
   { path: "/wip", name: "WIP", component: WIPPage },
