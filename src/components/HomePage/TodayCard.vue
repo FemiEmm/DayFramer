@@ -29,16 +29,12 @@
               class="action-btn yes"
               :class="{ active: nextTask.status === 'done' }"
               @click="setStatus(nextTask, 'done')"
-              aria-label="Mark next task done"
-              title="Mark done"
             >✓</button>
             <button
               type="button"
               class="action-btn no"
               :class="{ active: nextTask.status === 'not_done' }"
               @click="setStatus(nextTask, 'not_done')"
-              aria-label="Mark next task not done"
-              title="Mark not done"
             >✕</button>
           </div>
         </div>
@@ -48,34 +44,13 @@
       <div class="tasklist">
         <template v-if="allTasks.length">
           <ul class="tlist">
-            <!-- Columns: Header (title) | Content (note) | Date | ✓/✕ -->
-            <li v-for="(t, i) in allTasks" :key="t.id || i" class="trow">
-              <div class="cell head" :title="t.title">
-                {{ t.title }}
-              </div>
-              <div class="cell body" :title="t.note || ''">
-                {{ t.note || '—' }}
-              </div>
-              <div class="cell date">
-                {{ t.date }}
-              </div>
+            <li v-for="t in allTasks" :key="t.id" class="trow">
+              <div class="cell head">{{ t.title }}</div>
+              <div class="cell body">{{ t.note || '—' }}</div>
+              <div class="cell date">{{ t.date }}</div>
               <div class="cell actions">
-                <button
-                  type="button"
-                  class="action-btn yes"
-                  :class="{ active: t.status === 'done' }"
-                  @click="setStatus(t, 'done')"
-                  aria-label="Mark task done"
-                  title="Mark done"
-                >✓</button>
-                <button
-                  type="button"
-                  class="action-btn no"
-                  :class="{ active: t.status === 'not_done' }"
-                  @click="setStatus(t, 'not_done')"
-                  aria-label="Mark task not done"
-                  title="Mark not done"
-                >✕</button>
+                <button class="action-btn yes" :class="{ active: t.status === 'done' }" @click="setStatus(t,'done')">✓</button>
+                <button class="action-btn no"  :class="{ active: t.status === 'not_done' }" @click="setStatus(t,'not_done')">✕</button>
               </div>
             </li>
           </ul>
@@ -87,10 +62,9 @@
         </template>
       </div>
 
-      <!-- Plan (replaces reminder). Shows Personal and/or Team for current slot.
-           Hidden entirely if neither exists. -->
+      <!-- Plan -->
       <div v-if="personalPlanNow || teamPlanNow" class="plan-col">
-        <div v-if="personalPlanNow" class="plan-line" :title="personalPlanNow.title">
+        <div v-if="personalPlanNow" class="plan-line">
           <div class="plan-left">
             <span class="plan-slot">{{ personalPlanNow.slot }}</span>
             <span class="dash">—</span>
@@ -99,7 +73,7 @@
           <div class="plan-day">{{ todayDow }}</div>
         </div>
 
-        <div v-if="teamPlanNow" class="plan-line" :title="teamPlanNow.title">
+        <div v-if="teamPlanNow" class="plan-line">
           <div class="plan-left">
             <span class="plan-slot">{{ teamPlanNow.slot }}</span>
             <span class="dash">—</span>
@@ -128,16 +102,17 @@ type TaskStatus = "done" | "not_done";
 interface TaskRow {
   id: string;
   user_id: string;
-  task_date: string;       // 'YYYY-MM-DD'
+  task_date: string;
   title: string;
   note: string | null;
   type: string | null;
-  task_time: string | null;      // 'HH:MM' or 'HH:MM:SS'
-  reminder_time: string | null;  // 'HH:MM' or 'HH:MM:SS'
+  task_time: string | null;
+  reminder_time: string | null;
   priority: number | null;
   assigned_to: string | null;
   status: TaskStatus | null;
 }
+
 interface Task {
   id: string;
   date: string;
@@ -159,18 +134,13 @@ interface PlanRow {
   slot: Slot;
   title: string;
   notes: string | null;
-  created_at?: string;
-  owner_user_id?: string | null;
-  team_id?: string | null;
 }
 
 export default defineComponent({
   name: "TodayCard",
   setup() {
     const toISO = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-        d.getDate()
-      ).padStart(2, "0")}`;
+      `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 
     const today = new Date();
     const todayISO = toISO(today);
@@ -180,22 +150,22 @@ export default defineComponent({
 
     const tasks = ref<Task[]>([]);
     const loading = ref(true);
+    let intervalId: number | undefined;
 
-    // --- helpers
     const toMin = (t?: string) => {
       if (!t) return -1;
-      const [h, m] = (t || "").split(":").map(Number);
+      const [h, m] = t.split(":").map(Number);
       return (h || 0) * 60 + (m || 0);
     };
 
     const hhmm = (val: string | null) => {
       if (!val) return undefined;
       const [h, m] = val.split(":");
-      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      return `${h}:${m}`;
     };
 
     function dowLabel(d: Date): Day {
-      return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()] as Day;
+      return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()] as Day;
     }
     const todayDow = dowLabel(today);
 
@@ -206,7 +176,6 @@ export default defineComponent({
       return "Night";
     }
 
-    // --- identity
     async function loadIdentity() {
       const { data } = await supabase.auth.getSession();
       userId.value = data.session?.user.id ?? null;
@@ -221,51 +190,64 @@ export default defineComponent({
       }
     }
 
-    // --- tasks
     async function loadTodayTasks() {
       if (!userId.value) { tasks.value = []; loading.value = false; return; }
       loading.value = true;
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("tasks")
         .select("*")
         .eq("user_id", userId.value)
         .eq("task_date", todayISO)
         .order("task_time", { ascending: true });
 
-      if (error) {
-        tasks.value = [];
-      } else {
-        tasks.value = (data as TaskRow[]).map((r) => ({
-          id: r.id,
-          date: r.task_date,
-          time: hhmm(r.task_time),
-          title: r.title,
-          note: r.note || undefined,
-          type: (r.type || "others"),
-          priority: r.priority ?? 3,
-          assignedTo: r.assigned_to || "",
-          status: (r.status || "not_done") as TaskStatus,
-        })).sort((a, b) => toMin(a.time) - toMin(b.time));
-      }
+      tasks.value = (data as TaskRow[] || []).map(r => ({
+        id: r.id,
+        date: r.task_date,
+        time: hhmm(r.task_time),
+        title: r.title,
+        note: r.note || undefined,
+        type: r.type || "others",
+        priority: r.priority ?? 3,
+        assignedTo: r.assigned_to || "",
+        status: (r.status || "not_done") as TaskStatus,
+      })).sort((a,b) => toMin(a.time) - toMin(b.time));
 
       loading.value = false;
     }
 
-    async function setStatus(task: Task, which: TaskStatus) {
-      if (!task.id) return;
-      const { error } = await supabase
-        .from("tasks")
-        .update({ status: which })
-        .eq("id", task.id);
+    async function ensurePlannerTask() {
+      if (!userId.value) return;
 
-      if (!error) {
-        const idx = tasks.value.findIndex((t) => t.id === task.id);
-        if (idx !== -1) tasks.value.splice(idx, 1, { ...tasks.value[idx], status: which });
-      }
+      const { data } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("user_id", userId.value)
+        .eq("task_date", todayISO)
+        .limit(1);
+
+      if (data && data.length) return;
+
+      await supabase.from("tasks").insert({
+        user_id: userId.value,
+        task_date: todayISO,
+        title: "Do you wish to Plan your day",
+        note: "Seems you Forgot to plan your day",
+        task_time: "08:00",
+        reminder_time: "20:00",
+        priority: 3,
+        status: "not_done",
+      });
+
+      await loadTodayTasks();
     }
 
-    // --- plan (personal + team) for current slot
+    async function setStatus(task: Task, status: TaskStatus) {
+      await supabase.from("tasks").update({ status }).eq("id", task.id);
+      const i = tasks.value.findIndex(t => t.id === task.id);
+      if (i !== -1) tasks.value[i].status = status;
+    }
+
     const personalPlanNow = ref<PlanRow | null>(null);
     const teamPlanNow = ref<PlanRow | null>(null);
 
@@ -276,92 +258,87 @@ export default defineComponent({
 
       const slot = currentSlot();
 
-      // personal
-      const { data: pData } = await supabase
+      const { data: p } = await supabase
         .from("personal_plan_entries")
         .select("*")
         .eq("owner_user_id", userId.value)
         .eq("day_of_week", todayDow)
         .eq("slot", slot)
-        .order("created_at", { ascending: false })
         .limit(1);
 
-      personalPlanNow.value = (pData && pData[0]) ? (pData[0] as PlanRow) : null;
+      personalPlanNow.value = p?.[0] || null;
 
-      // team
       if (teamId.value) {
-        const { data: tData } = await supabase
+        const { data: t } = await supabase
           .from("team_plan_entries")
           .select("*")
           .eq("team_id", teamId.value)
           .eq("day_of_week", todayDow)
           .eq("slot", slot)
-          .order("created_at", { ascending: false })
           .limit(1);
 
-        teamPlanNow.value = (tData && tData[0]) ? (tData[0] as PlanRow) : null;
+        teamPlanNow.value = t?.[0] || null;
       }
     }
 
-    // --- lifecycle
-    let off: (() => void) | undefined;
     onMounted(async () => {
       await loadIdentity();
       await loadTodayTasks();
       await loadPlansForNow();
-      off = onTasksUpdated(({ date }) => {
+      await ensurePlannerTask();
+
+      intervalId = window.setInterval(async () => {
+        await loadTodayTasks();
+        await ensurePlannerTask();
+      }, 30 * 60 * 1000);
+
+      onTasksUpdated(({ date }) => {
         if (!date || date === todayISO) loadTodayTasks();
       });
     });
-    onBeforeUnmount(() => { off?.(); });
 
-    // --- derived
+    onBeforeUnmount(() => {
+      if (intervalId) clearInterval(intervalId);
+    });
+
     const allTasks = computed(() => tasks.value);
+    const total = computed(() => allTasks.value.length);
+    const completed = computed(() => allTasks.value.filter(t => t.status==="done").length);
 
-    const nowMins = () => {
-      const n = new Date();
-      return n.getHours() * 60 + n.getMinutes();
-    };
+    const nowMins = () => new Date().getHours()*60 + new Date().getMinutes();
+
     const upcomingOnly = computed(() =>
-      tasks.value.filter((t) => (t.time ? toMin(t.time) >= nowMins() : true))
+      tasks.value.filter(t => t.time ? toMin(t.time) >= nowMins() : true)
     );
 
-    const nextTask = computed<Task | null>(() => {
+    const nextTask = computed(() => {
       if (!upcomingOnly.value.length) return null;
-      const timed = upcomingOnly.value.filter((t) => t.time && toMin(t.time) !== -1);
-      return (timed.length ? timed : upcomingOnly.value)
-        .slice()
-        .sort((a, b) => toMin(a.time) - toMin(b.time))[0] || null;
+      return [...upcomingOnly.value].sort((a,b) => toMin(a.time) - toMin(b.time))[0];
     });
 
     const nextTitle = computed(() => nextTask.value?.title || "");
     const nextTime = computed(() => nextTask.value?.time || "");
 
-    const total = computed(() => allTasks.value.length);
-    const completed = computed(() => allTasks.value.filter((t) => t.status === "done").length);
-
     const todayLabel = computed(() =>
-      new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" })
+      today.toLocaleDateString(undefined, { month:"short", day:"numeric" })
     );
 
-    const moodSrcs = {
+    const moods = {
       bored: boredImg,
       happy: happyImg,
       excited: excitedImg,
       "lets-go": letsGoImg,
       godmode: godmodeImg,
-    } as const;
+    };
 
-    const currentMood = computed(() => {
+    const currentMoodSrc = computed(() => {
       const c = completed.value;
-      if (c >= 4) return "godmode";
-      if (c === 3) return "lets-go";
-      if (c === 2) return "excited";
-      if (c === 1) return "happy";
-      return "bored";
+      if (c >= 4) return moods.godmode;
+      if (c === 3) return moods["lets-go"];
+      if (c === 2) return moods.excited;
+      if (c === 1) return moods.happy;
+      return moods.bored;
     });
-
-    const currentMoodSrc = computed(() => moodSrcs[currentMood.value as keyof typeof moodSrcs]);
 
     return {
       todayLabel,
