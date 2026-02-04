@@ -1,7 +1,12 @@
 <template>
   <nav class="dashboard" aria-label="Primary">
     <div class="brand">
-      <button @click="navigateTo('Onboarding')" class="navbtn" aria-label="Dayframe">
+      <button
+        @click="navigateTo('Onboarding')"
+        class="navbtn"
+        :class="{ active: route.name === 'Onboarding' }"
+        aria-label="Dayframe"
+      >
         <i class="icon fa-solid fa-calendar-days" aria-hidden="true"></i>
         <span class="text">Dayframe</span>
       </button>
@@ -11,31 +16,60 @@
 
     <ul class="menu">
       <li>
-        <button @click="navigateTo('Homepage')" class="navbtn" aria-label="Home">
+        <button
+          @click="navigateTo('Homepage')"
+          class="navbtn"
+          :class="{ active: route.name === 'Homepage' }"
+          aria-label="Home"
+        >
           <i class="icon fa fa-home" aria-hidden="true"></i>
           <span class="text">Home</span>
         </button>
       </li>
+
       <li>
-        <button @click="navigateTo('Dayframer')" class="navbtn" aria-label="Dayframer">
+        <button
+          @click="navigateTo('Dayframer')"
+          class="navbtn"
+          :class="{ active: route.name === 'Dayframer' }"
+          aria-label="Dayframer"
+        >
           <i class="icon fa fa-user" aria-hidden="true"></i>
           <span class="text">Dayframer</span>
         </button>
       </li>
+
       <li>
-        <button @click="navigateTo('Monthly')" class="navbtn" aria-label="Monthly">
+        <button
+          @click="navigateTo('Monthly')"
+          class="navbtn"
+          :class="{ active: route.name === 'Monthly' }"
+          aria-label="Monthly"
+        >
           <i class="icon fa fa-calendar" aria-hidden="true"></i>
           <span class="text">Monthly</span>
         </button>
       </li>
+
       <li>
-        <button @click="navigateTo('TeamManagement')" class="navbtn" aria-label="Team">
+        <button
+          @click="navigateTo('TeamManagement')"
+          class="navbtn"
+          :class="{ active: route.name === 'TeamManagement' }"
+          aria-label="Team"
+        >
           <i class="icon fa fa-cogs" aria-hidden="true"></i>
           <span class="text">Team</span>
         </button>
       </li>
+
       <li>
-        <button @click="navigateTo('PlanPage')" class="navbtn" aria-label="Plan">
+        <button
+          @click="navigateTo('PlanPage')"
+          class="navbtn"
+          :class="{ active: route.name === 'PlanPage' }"
+          aria-label="Plan"
+        >
           <i class="icon fa fa-tasks" aria-hidden="true"></i>
           <span class="text">Plan</span>
         </button>
@@ -47,6 +81,7 @@
           <span class="text">Theme</span>
         </button>
       </li>
+
       <li>
         <button @click="goSettings" class="navbtn" aria-label="Settings">
           <i class="icon fa fa-cog" aria-hidden="true"></i>
@@ -81,7 +116,7 @@
           :disabled="signingOut"
           :aria-busy="signingOut"
         >
-          {{ signingOut ? 'Signing out…' : 'Yes' }}
+          {{ signingOut ? "Signing out…" : "Yes" }}
         </button>
         <button
           @click="closeSignOutModal"
@@ -97,13 +132,14 @@
 
 <script lang="ts">
 import { defineComponent, ref, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { supabase } from "../lib/supabase";
 
 export default defineComponent({
   name: "Dashboard",
   setup() {
     const router = useRouter();
+    const route = useRoute();
 
     const showSignOutModal = ref(false);
     const signingOut = ref(false);
@@ -158,6 +194,7 @@ export default defineComponent({
     };
 
     return {
+      route,
       showSignOutModal,
       signingOut,
       navigateTo,
@@ -172,7 +209,6 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ===== Shell ===== */
 .dashboard {
   position: fixed;
   top: 0; left: 0;
@@ -190,7 +226,6 @@ export default defineComponent({
 }
 .dashboard:hover { width: 150px; }
 
-/* Top brand, middle menu, bottom sign-out */
 .brand { padding-top: 20px; }
 .menu  {
   list-style: none; margin: 0; padding: 20px 0;
@@ -200,17 +235,14 @@ export default defineComponent({
 }
 .bottom { padding-bottom: 10px; }
 
-/* Separator */
 .sep-line {
   background-color: var(--button-color);
   border: none;
   height: 2px;
   width: 80%;
   margin: 10px auto;
-  transition: background-color 0.3s ease;
 }
 
-/* Shared button style (brand, items, signout all match) */
 .navbtn {
   width: 100%;
   display: flex; align-items: center; gap: 10px;
@@ -224,6 +256,15 @@ export default defineComponent({
 }
 .navbtn:hover { color: var(--button-hover-color); transform: translateY(-1px); }
 
+/* .navbtn.active {
+  background-color: rgba(37, 99, 235, 0.12);
+  color: var(--button-hover-color);
+} */
+
+.navbtn.active .icon {
+  color: var(--button-hover-color);
+}
+
 .icon { font-size: 1.2em; width: 24px; text-align: center; }
 .text {
   opacity: 0;
@@ -232,13 +273,11 @@ export default defineComponent({
 }
 .dashboard:hover .text { opacity: 1; transform: translateX(0); }
 
-/* ===== Mobile: bottom bar (icons only); brand hidden; signout at end ===== */
 @media (max-width: 768px) {
   .dashboard {
     top: auto; bottom: 0; right: 0;
     width: 100%; height: 64px;
     padding: 0 8px;
-    box-shadow: 0 -6px 20px rgba(0,0,0,.12);
     flex-direction: row;
     align-items: center;
   }
@@ -256,33 +295,6 @@ export default defineComponent({
   .text { display: none !important; }
   .navbtn { padding: 10px; border-radius: 999px; font-size: 12px; }
 
-  .bottom {
-    padding: 0 4px 0 6px;
-  }
+  .bottom { padding: 0 4px 0 6px; }
 }
-
-/* ===== Modal ===== */
-.modal-overlay {
-  position: fixed; inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: grid; place-items: center;
-  z-index: 1500;
-}
-.modal {
-  width: min(92vw, 320px);
-  background: var(--background-color);
-  color: var(--primary-text-color);
-  padding: 20px; border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.2);
-  text-align: center;
-}
-.confirm-button, .cancel-button {
-  padding: 10px 14px;
-  border: none; border-radius: 10px;
-  font-weight: 800; cursor: pointer; margin: 6px;
-}
-.confirm-button { background-color: var(--button-color); color: var(--primary-text-color); }
-.cancel-button  { background-color: var(--button-hover-color); color: #fff; }
-.confirm-button[disabled] { opacity: .7; cursor: not-allowed; }
-.confirm-button:hover:not([disabled]), .cancel-button:hover { filter: brightness(0.95); }
 </style>

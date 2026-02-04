@@ -8,9 +8,22 @@
       </h2>
 
       <label class="field">
-        <span class="label">Date</span>
+      <span class="label">Date</span>
+
+      <div style="display:flex; gap:8px; align-items:center;">
         <input v-model="selectedDateISO" class="input" type="date" />
-      </label>
+
+        <button
+          type="button"
+          class="btn-pick"
+          :class="{ 'btn-multi-active': hasMultipleDates }"
+          @click="showMultiDatePicker = true"
+        >
+          Pick days
+        </button>
+      </div>
+    </label>
+
 
       <label class="field">
         <span class="label">To do</span>
@@ -74,7 +87,15 @@
       </div>
 
       <div class="actions">
-        <button class="btn btn-secondary" @click="$emit('cancel')">Cancel</button>
+       <button
+          class="btn btn-secondary"
+          @click="
+            clearMultiDates();
+            $emit('cancel');
+          ">
+          Cancel
+        </button>
+
         <button class="btn btn-primary" :disabled="!canStage" @click="stageTask">Add Task</button>
       </div>
 
@@ -105,6 +126,13 @@
               <p v-if="task.note" class="task-note">{{ task.note }}</p>
             </div>
             <span :class="['priority-badge', `level-${task.priority}`]">P{{ task.priority }}</span>
+          <button
+  class="btn btn-secondary btn-edit"
+  @click="editStagedTask(i)"
+>
+  Edit
+</button>
+
           </li>
         </ul>
       </div>
@@ -134,13 +162,21 @@
       <div v-if="loading" class="empty-state">Loading…</div>
     </div>
   </div>
+  <!-- Multi date picker modal -->
+<MultiDatePicker
+  v-model="showMultiDatePicker"
+/>
+
+
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch } from "vue";
+import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from "vue";
 import TimeField from "@/components/Ui/TimeField.vue";
 import { notifyTasksUpdated } from "@/utils/tasksBus";
 import { supabase } from "@/lib/supabase";
+import MultiDatePicker from "@/components/Ui/MultiDatePickerModal.vue";
+
 
 type SavedTask = {
   id: string;
@@ -182,9 +218,14 @@ function hhmm(t: string | null): string | null {
   return `${h}:${m}`;
 }
 
+const MULTI_DATES_KEY = "planmyday_multi_dates";
+
+
 export default defineComponent({
   name: "PlanMyDayForm",
-  components: { TimeField },
+  components: { TimeField,
+      MultiDatePicker,
+   },
   emits: ["cancel", "submit"],
   setup() {
     const todayISO = toISO(new Date());
@@ -199,6 +240,61 @@ export default defineComponent({
 
     const stagedTasks = ref<StagedTask[]>([]);
     const savedTasks  = ref<SavedTask[]>([]);
+
+    const hasMultipleDates = ref(false);
+    const showMultiDatePicker = ref(false);
+
+    function checkMultipleDates() {
+      try {
+        const raw = localStorage.getItem(MULTI_DATES_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        hasMultipleDates.value = Array.isArray(parsed) && parsed.length > 0;
+      } catch {
+        hasMultipleDates.value = false;
+      }
+    }
+
+    function clearMultiDates() {
+        localStorage.removeItem(MULTI_DATES_KEY);
+        hasMultipleDates.value = false;
+      }
+
+
+    function getMultiDates(): string[] {
+        try {
+          const raw = localStorage.getItem(MULTI_DATES_KEY);
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+
+
+        watch(showMultiDatePicker, (open) => {
+          if (!open) {
+            checkMultipleDates();
+          }
+        });
+
+
+    function editStagedTask(index: number) {
+        const task = stagedSorted.value[index];
+        if (!task) return;
+
+        // Load task back into form
+        newTask.value = { ...task };
+
+        // Remove it from staged list
+        const originalIndex = stagedTasks.value.findIndex(
+          t => t === task
+        );
+        if (originalIndex !== -1) {
+          stagedTasks.value.splice(originalIndex, 1);
+        }
+      }
+
+
 
     const teamMembers = ref<Member[]>([]);
     const inTeam = computed(() => teamMembers.value.length > 1 || (teamMembers.value.length === 1 && teamMembers.value[0].user_id !== userId.value ? true : false));
@@ -325,6 +421,12 @@ export default defineComponent({
       loading.value = false;
     }
 
+    async function refreshSavedTasks() {
+      await loadSavedForDate();
+    }
+
+
+
     function stageTask() {
       if (!canStage.value) return;
       stagedTasks.value.push({ ...newTask.value });
@@ -339,46 +441,65 @@ export default defineComponent({
       };
     }
 
-    async function approveAll() {
-      if (!userId.value || !stagedTasks.value.length) return;
-      saving.value = true;
-      err.value = "";
+   async function approveAll() {
+  if (!userId.value || !stagedTasks.value.length) return;
 
-      try {
-        const payloads = stagedTasks.value.map(s => ({
-          user_id: userId.value,
-          task_date: selectedDateISO.value,
-          title: s.title,
-          note: s.note || null,
-          type: s.type || null,
-          task_time: s.time || null,
-          reminder_time: s.reminder || null,
-          priority: s.priority || 3,
-          assigned_to: s.assignedTo || null,
-        }));
+  saving.value = true;
+  err.value = "";
 
-        const { data, error } = await supabase
-          .from("tasks")
-          .insert(payloads)
-          .select();
+  const multiDates = getMultiDates();
 
-        if (error) throw error;
+  const datesToUse =
+    multiDates.length > 0 ? multiDates : [selectedDateISO.value];
 
-        const inserted = (data || []).map((r: any) => ({
-          ...r,
-          task_time: hhmm(r.task_time),
-          reminder_time: hhmm(r.reminder_time),
-        })) as SavedTask[];
+  try {
+    const payloads = stagedTasks.value.flatMap(task =>
+      datesToUse.map(date => ({
+        user_id: userId.value,
+        task_date: date,
+        title: task.title,
+        note: task.note || null,
+        type: task.type || null,
+        task_time: task.time || null,
+        reminder_time: task.reminder || null,
+        priority: task.priority || 3,
+        assigned_to: task.assignedTo || null,
+      }))
+    );
 
-        savedTasks.value.push(...inserted);
-        stagedTasks.value = [];
-        notifyTasksUpdated(selectedDateISO.value);
-      } catch (e: any) {
-        err.value = e?.message || "Could not save tasks.";
-      } finally {
-        saving.value = false;
-      }
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert(payloads)
+      .select();
+
+    if (error) throw error;
+
+    const inserted = (data || []).map((r: any) => ({
+      ...r,
+      task_time: hhmm(r.task_time),
+      reminder_time: hhmm(r.reminder_time),
+    })) as SavedTask[];
+
+    stagedTasks.value = [];
+    await refreshSavedTasks();
+
+    // cleanup ONLY after success
+    if (multiDates.length > 0) {
+      localStorage.removeItem(MULTI_DATES_KEY);
+      checkMultipleDates();
     }
+
+    notifyTasksUpdated(selectedDateISO.value);
+  } catch (e: any) {
+    err.value = e?.message || "Could not save tasks.";
+  } finally {
+    saving.value = false;
+  }
+}
+
+
+
+
 
     onMounted(async () => {
       await loadUser();
@@ -387,12 +508,19 @@ export default defineComponent({
       if (!newTask.value.assignedTo && teamMembers.value.length) {
         newTask.value.assignedTo = teamMembers.value[0].display_name;
       }
+      checkMultipleDates();
+
     });
 
     watch(selectedDateISO, async () => {
       stagedTasks.value = [];
       await loadSavedForDate();
     });
+
+    onUnmounted(() => {
+  clearMultiDates();
+});
+
 
     return {
       selectedDateISO,
@@ -417,6 +545,15 @@ export default defineComponent({
       teamMembers,
       assignDisabled,
       assignHelp,
+
+      hasMultipleDates,
+      showMultiDatePicker,
+
+      editStagedTask,
+      refreshSavedTasks,
+
+      clearMultiDates,
+
     };
   },
 });
@@ -446,6 +583,7 @@ export default defineComponent({
 
 .actions { display: flex; justify-content: flex-end; gap: 6px; }
 .btn { padding: 8px 12px; border-radius: 999px; border: 1px solid #e5e7eb; cursor: pointer; font-size: 12px; }
+.btn-pick {margin-left: 20px; width: 100px;  padding: 8px 12px; border-radius: 999px; border: 1px solid #e5e7eb; cursor: pointer; font-size: 12px; }
 .btn-primary { background: #111; color: #fff; border-color: #111; }
 .btn-secondary { background: #fff; color: #111; }
 
@@ -490,4 +628,12 @@ export default defineComponent({
 .muted { color:#666; font-size:11px; }
 
 .err { color: #d32f2f; margin-top: 8px; }
+
+.btn-multi-active {
+  background: #16a34a;
+  color: #fff;
+  border-color: #16a34a;
+}
+
+
 </style>

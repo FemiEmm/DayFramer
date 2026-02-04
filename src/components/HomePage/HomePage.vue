@@ -1,11 +1,12 @@
 <template>
-  <div class="page-content"><!-- offsets for sidebar -->
+  <div class="page-content">
+    <!-- BELOW HERO -->
     <section class="below-hero">
       <div class="user-greeting-wrapper">
         <UserGreeting />
       </div>
       <DashBoard />
-    </section>    
+    </section>
 
     <!-- HERO -->
     <section class="hero">
@@ -16,26 +17,42 @@
           <UiBadge icon="✨" label="Smart suggestions" />
         </div>
 
-        <!-- Rotating headline with fade transition -->
-        <transition name="fade" mode="out-in">
-          <h1
-            class="hero-title"
-            v-html="currentHeadline"
-            :key="currentHeadline"
-          ></h1>
-        </transition>
-
-        <p class="hero-sub">
-          Stay on top of your tasks, take breaks when you need them, and let us handle the reminders.
-        </p>
-
-        <div class="hero-ctas">
-          <!-- OPEN MODAL -->
-          <button class="btn btn-primary" @click="showPlanModal = true">Plan My Day</button>
-          <button class="btn btn-secondary">Add Task</button>
+        <!-- TOGGLING CONTENT -->
+        <div class="toggle-space">
+          <transition name="fade" mode="out-in">
+            <RotatingGreeting
+              v-if="heroView === 'greeting'"
+              key="greeting"
+            />
+            <TaskLoadCalendar
+              v-else
+              key="taskload"
+            />
+          </transition>
         </div>
 
-        <a href="#" class="hero-link">Need help? Visit the guide.</a>
+        <!-- CTA + LINK (ALIGNED) -->
+        <div class="hero-ctas">
+          <div class="cta-row">
+            <button
+              class="btn btn-primary"
+              @click="showPlanModal = true"
+            >
+              Plan My Day
+            </button>
+
+            <button
+              class="btn btn-secondary"
+              @click="toggleHeroView"
+            >
+              {{ heroView === 'taskload' ? 'Daily Greetings' : 'Monthly' }}
+            </button>
+          </div>
+
+          <a href="#" class="hero-link">
+            Need help? Visit the guide.
+          </a>
+        </div>
       </div>
 
       <!-- RIGHT -->
@@ -62,81 +79,80 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onBeforeUnmount } from "vue";
+import { defineComponent, ref } from "vue";
+
 import DashBoard from "../DashBoard.vue";
-import UserGreeting from "@/components/HomePage/UserGreeting.vue";
+import UserGreeting from "./UserGreeting.vue";
+import RotatingGreeting from "./RotatingGreeting.vue";
+import TaskLoadCalendar from "./TaskLoadCalendar.vue";
 import TodayCard from "./TodayCard.vue";
 import UiBadge from "./UiBadge.vue";
 
-/* NEW: reusable modal + your plan form */
 import BaseModal from "@/components/Ui/BaseModal.vue";
-import PlanMyDayForm from "@/components/HomePage/PlanMyDayForm.vue"; // adjust path if you placed it elsewhere
+import PlanMyDayForm from "./PlanMyDayForm.vue";
 
 export default defineComponent({
-  name: "Homepage",
-  components: { DashBoard, UserGreeting, TodayCard, UiBadge, BaseModal, PlanMyDayForm },
+  name: "HomePage",
+  components: {
+    DashBoard,
+    UserGreeting,
+    RotatingGreeting,
+    TaskLoadCalendar,
+    TodayCard,
+    UiBadge,
+    BaseModal,
+    PlanMyDayForm,
+  },
   setup() {
-    // Headlines rotate every 30 seconds
-    const headlines = [
-      "Have you<br>planned your <br> day?",
-      "When are you<br>going grocery<br>shopping?",
-      "What’s your<br>top priority today?",
-      "Don’t forget to<br>take a break.<br>relax and rest.",
-      "Any tasks you <br>can finish in<br>5 minutes?",
-    ];
-    const idx = ref(0);
-    const currentHeadline = ref(headlines[idx.value]);
-    let timer: number | undefined;
-
-    onMounted(() => {
-      timer = window.setInterval(() => {
-        idx.value = (idx.value + 1) % headlines.length;
-        currentHeadline.value = headlines[idx.value];
-      }, 30000); // 30s
-    });
-
-    onBeforeUnmount(() => {
-      if (timer) clearInterval(timer);
-    });
-
-    // Modal state
+    const heroView = ref<"greeting" | "taskload">("greeting");
     const showPlanModal = ref(false);
 
-    // Handle form submit
-    const handlePlanSubmit = (payload: { date: string; title: string; time: string; priority: number }) => {
-      // TODO: save payload to your store/localStorage/api as needed
-      // console.log("Plan payload:", payload);
+    const toggleHeroView = () => {
+      heroView.value =
+        heroView.value === "taskload" ? "greeting" : "taskload";
+    };
+
+    const handlePlanSubmit = () => {
       showPlanModal.value = false;
     };
 
-    return { currentHeadline, showPlanModal, handlePlanSubmit };
+    return {
+      heroView,
+      toggleHeroView,
+      showPlanModal,
+      handlePlanSubmit,
+    };
   },
 });
 </script>
 
 <style scoped>
-:root {
-  --sidebar-w: 72px;         /* adjust if your blue sidebar is wider */
-  --hero-max: 1200px;
-  --text: #121212;
-  --subtext: #606060;
-  --primary: #111111;
-  --primary2: #444444;
-  --white: #ffffff;
-}
-
-/* === page wrapper to avoid sidebar overlap === */
 .page-content {
-  min-height: 100vh;              /* ensure full screen height */
-  width: 100%;                    /* span full width */
+  min-height: 100vh;
+  width: 100%;
   padding: 50px 50px 0px 150px;
-  background-color: var(--background-color);
   box-sizing: border-box;
 }
 
-/* Section layout */
+/* BELOW HERO */
+.below-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 120px 0px;
+}
+
+.user-greeting-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* HERO */
 .hero {
-  max-width: var(--hero-max);
+  max-width: 1200px;
   margin: 0 auto;
   padding: 80px 24px 40px;
   display: grid;
@@ -145,93 +161,91 @@ export default defineComponent({
   align-items: center;
 }
 
-.hero-left { display: flex; flex-direction: column; }
-.badges { display: flex; gap: 12px; margin-bottom: 20px; }
+.hero-left {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+}
 
-.hero-title {
-  font-size: clamp(40px, 6vw, 72px);
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  font-weight: 800;
-  color: var(--text);
-  margin: 0;
-  text-align: left;
+.toggle-space {
+  min-height: 400px;
+  max-height: 400px;
 }
-.hero-sub {
-  margin-top: 16px;
-  color: var(--subtext);
-  font-size: 16px;
-  max-width: 600px;
-  text-align: left;
+
+.badges {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
 }
-.hero-ctas { display: flex; gap: 12px; margin-top: 28px; }
+
+/* CTA FIX */
+.hero-ctas {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.cta-row {
+  display: flex;
+  gap: 12px;
+}
 
 .btn {
   padding: 12px 20px;
   border-radius: 999px;
   font-weight: 600;
-  border: 1px solid transparent;
   cursor: pointer;
-  transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  border: 1px solid transparent;
 }
+
 .btn-primary {
+  background: var(--button-color);
   color: var(--secondary-text-color);
-  background-color: var(--button-color);
-  box-shadow: 0 10px 24px rgba(0,0,0,.18);
-}
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 36px rgba(0,0,0,.22);
-  background-color: var(--button-hover-color);
-  color: var(--primary-text-color);
 }
 
 .btn-secondary {
-  background: var(--white);
-  color: var(--text);
+  background: #ffffff;
+  color: #121212;
   border-color: #e8e8e8;
-  box-shadow: 0 4px 12px rgba(0,0,0,.06);
 }
-.btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(0,0,0,.12); }
 
 .hero-link {
-  margin-top: 10px;
-  color: #7a7a7a;
   font-size: 14px;
   text-decoration: underline;
-  width: fit-content;
+  color: #7a7a7a;
 }
 
-.hero-right { justify-self: center; 
-
+/* RIGHT */
+.hero-right {
+  justify-self: center;
 }
 
-/* BELOW HERO layout */
-.below-hero {
-  display: flex;
-  justify-content: space-between; /* pushes greeting left, dashboard right */
-  align-items: center;            /* vertically aligns them */
-  max-width: var(--hero-max);
-  margin: 0 auto;
-  padding: 0 120px 0px;
+/* FADE TRANSITION */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.4s ease;
 }
-
-.user-greeting-wrapper {
-  flex: 1;
-  display: flex;
-  justify-content: flex-end; /* pushes greeting to the right */
-}
-
-/* Fade transition for rotating headline */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.8s ease-in-out;
-}
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 
-/* Responsive */
+/* RESPONSIVE */
 @media (max-width: 980px) {
-  .page-content { padding-left: 16px; } /* sidebar likely collapses on mobile */
-  .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 56px; padding-bottom: 24px; }
-  .hero-right { justify-self: stretch; display: flex; justify-content: center; }
+  .page-content {
+    padding-left: 16px;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .hero-right {
+    display: flex;
+    justify-content: center;
+  }
 }
 </style>

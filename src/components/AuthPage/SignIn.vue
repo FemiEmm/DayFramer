@@ -67,9 +67,9 @@
           >
             Forgot password?
           </button>
-          <router-link class="link-btn" :to="{ path: '/welcome', query: { mode: 'signup', redirect } }">
+          <!-- <router-link class="link-btn" :to="{ path: '/welcome', query: { mode: 'signup', redirect } }">
             Create account
-          </router-link>
+          </router-link> -->
         </div>
 
         <button class="btn btn-primary full" type="submit" :disabled="loading || !canSubmit">
